@@ -13,5 +13,9 @@ int bookshelf_read(const char *aux_path, Netlist *nl);
 int parse_nodes(const char *path, Netlist *nl, StrMap *names);
 int parse_nets(const char *path, Netlist *nl, const StrMap *names);
 int parse_pl(const char *path, Netlist *nl, const StrMap *names);
+int parse_scl(const char *path, Netlist *nl);
+
+// Escribe las posiciones actuales en formato .pl (mismo formato que se lee arriba).
+int write_pl(const char *path, const Netlist *nl, const float *v);
 
 #endif

@@ -23,7 +23,7 @@ static void test_wa_two_pins(void)
     Cell cells[2] = {{0}};
     Pin pins[2] = {{0, 0, 0, 0}, {1, 0, 0, 0}};
     Net nets[1] = {{0, 0, 2}};
-    Netlist nl = {2, 1, 2, cells, nets, pins};
+    Netlist nl = {2, 1, 2, cells, nets, pins, 0, NULL};
 
     float v[4] = {0, 10, 0, 0};     // x0, x1, y0, y1
     float grad[4];

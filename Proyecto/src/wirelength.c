@@ -14,6 +14,7 @@ double compute_hpwl(const Netlist *nl, const float *v)
     int n = nl->num_cells;
     double total = 0.0;
 
+    #pragma omp parallel for reduction(+:total) if(nl->num_nets > 1000)
     for (int i = 0; i < nl->num_nets; i++) {
         const Net *net = &nl->nets[i];
         if (net->degree < 2)
@@ -69,6 +70,8 @@ static double wa_net(const Netlist *nl, const Net *net, const float *v, int dim,
             double am = expf((lo - c) * inv_gamma);
             double g = ap / sum_p * (1 + (c - wa_p) * inv_gamma)
                      - am / sum_m * (1 - (c - wa_m) * inv_gamma);
+            // dos redes distintas pueden compartir una celda, por eso atomico
+            #pragma omp atomic
             grad[dim * n + pins[k].cell] += g;
         }
     }
@@ -83,6 +86,9 @@ double compute_wirelength(const Netlist *nl, const float *v, float gamma, float 
     if (grad)
         memset(grad, 0, 2 * nl->num_cells * sizeof(float));
 
+    // redes distintas son independientes entre si; el gradiente compartido
+    // (una celda en varias redes) se protege adentro de wa_net con atomico.
+    #pragma omp parallel for reduction(+:total) if(nl->num_nets > 1000)
     for (int i = 0; i < nl->num_nets; i++) {
         const Net *net = &nl->nets[i];
         if (net->degree < 2)
