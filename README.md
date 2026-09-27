@@ -42,12 +42,6 @@ Ya lo probamos no solo con el circuito de juguete: en `bench/ispd2005` corrimos
 
 ## Cómo probarlo
 
-```bash
-cd Proyecto
-make && make test
-./build/placer bench/toy/toy.aux
-```
-
 Con el benchmark real (hay que descargarlo antes, no viene en el repo):
 
 ```bash
