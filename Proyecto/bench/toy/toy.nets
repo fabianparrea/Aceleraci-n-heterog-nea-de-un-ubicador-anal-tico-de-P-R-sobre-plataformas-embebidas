@@ -1,0 +1,21 @@
+UCLA nets 1.0
+# HPWL a mano: n0 = 16, n1 = 5, n2 = 12, n3 = 40, total 73
+
+NumNets : 4
+NumPins : 11
+
+NetDegree : 3 n0
+    c0 B : 0.0 0.0
+    c1 B : 0.0 0.0
+    c2 B : 0.0 0.0
+NetDegree : 2 n1
+    c2 O : 1.0 0.0
+    c3 I : -1.0 1.0
+NetDegree : 3 n2
+    c3 O : 0.0 0.0
+    c4 I : 1.0 -1.0
+    c5 I : -2.0 0.0
+NetDegree : 3 n3
+    p0 O : 0.0 0.0
+    c4 I : 0.0 0.0
+    p1 I : 0.0 0.0

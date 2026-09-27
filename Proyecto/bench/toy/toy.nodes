@@ -1,0 +1,14 @@
+UCLA nodes 1.0
+# netlist de juguete para las pruebas
+
+NumNodes : 8
+NumTerminals : 2
+
+    c0    4    2
+    c1    4    2
+    c2    2    2
+    c3    2    2
+    c4    4    2
+    c5    6    2
+    p0    1    1    terminal
+    p1    1    1    terminal
