@@ -22,6 +22,14 @@ typedef struct {
     int degree;
 } Net;
 
+// una fila del chip (del .scl): las celdas se legalizan alineadas a esto
+typedef struct {
+    float x0, y0;        // esquina inferior izquierda de la fila
+    float height;
+    float site_w;        // ancho de un sitio: la x legal es x0 + k*site_w
+    int num_sites;        // la fila va de x0 a x0 + num_sites*site_w
+} Row;
+
 typedef struct {
     int num_cells;
     int num_nets;
@@ -29,6 +37,8 @@ typedef struct {
     Cell *cells;
     Net *nets;
     Pin *pins;
+    int num_rows;        // 0 si el benchmark no trae .scl (no se puede legalizar)
+    Row *rows;
 } Netlist;
 
 // El vector de posiciones v tiene 2N floats con los centros de las celdas:

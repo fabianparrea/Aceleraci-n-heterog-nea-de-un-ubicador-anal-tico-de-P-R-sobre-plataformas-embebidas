@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -std=gnu11 -O2 -Wall -Wextra -MMD -MP -Iinclude
-LDLIBS = -lm
+CFLAGS = -std=gnu11 -O3 -fopenmp -Wall -Wextra -MMD -MP -Iinclude
+LDLIBS = -lm -fopenmp
 
 SRCS = $(filter-out src/main.c, $(wildcard src/*.c))
 OBJS = $(SRCS:src/%.c=build/%.o)

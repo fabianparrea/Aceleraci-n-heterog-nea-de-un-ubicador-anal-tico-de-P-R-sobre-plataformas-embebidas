@@ -29,5 +29,6 @@ void netlist_free(Netlist *nl)
     free(nl->cells);
     free(nl->nets);
     free(nl->pins);
+    free(nl->rows);
     memset(nl, 0, sizeof *nl);
 }

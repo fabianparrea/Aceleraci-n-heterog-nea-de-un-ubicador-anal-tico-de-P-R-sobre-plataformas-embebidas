@@ -3,8 +3,9 @@
 #include "bookshelf.h"
 #include "lineio.h"
 
-// Saca del .aux los nombres de los .nodes, .nets y .pl
-static int read_aux(const char *aux_path, char *nodes, char *nets, char *pl, size_t size)
+// Saca del .aux los nombres de los .nodes, .nets, .pl y .scl (este ultimo es
+// opcional: sin el no se puede legalizar, pero si se puede ubicar).
+static int read_aux(const char *aux_path, char *nodes, char *nets, char *pl, char *scl, size_t size)
 {
     FILE *f = fopen(aux_path, "r");
     if (!f) {
@@ -20,7 +21,7 @@ static int read_aux(const char *aux_path, char *nodes, char *nets, char *pl, siz
 
     char line[LINE_LEN];
     int lineno = 0;
-    nodes[0] = nets[0] = pl[0] = '\0';
+    nodes[0] = nets[0] = pl[0] = scl[0] = '\0';
 
     while (next_line(f, line, sizeof line, &lineno)) {
         char *colon = strchr(line, ':');
@@ -36,6 +37,8 @@ static int read_aux(const char *aux_path, char *nodes, char *nets, char *pl, siz
                 snprintf(nets, size, "%s%s", dir, tok);
             else if (strcmp(dot, ".pl") == 0)
                 snprintf(pl, size, "%s%s", dir, tok);
+            else if (strcmp(dot, ".scl") == 0)
+                snprintf(scl, size, "%s%s", dir, tok);
         }
     }
     fclose(f);
@@ -49,11 +52,11 @@ static int read_aux(const char *aux_path, char *nodes, char *nets, char *pl, siz
 
 int bookshelf_read(const char *aux_path, Netlist *nl)
 {
-    char nodes[PATH_LEN], nets[PATH_LEN], pl[PATH_LEN];
+    char nodes[PATH_LEN], nets[PATH_LEN], pl[PATH_LEN], scl[PATH_LEN];
     StrMap names = {0};
 
     memset(nl, 0, sizeof *nl);
-    if (read_aux(aux_path, nodes, nets, pl, PATH_LEN) < 0)
+    if (read_aux(aux_path, nodes, nets, pl, scl, PATH_LEN) < 0)
         return -1;
 
     if (parse_nodes(nodes, nl, &names) < 0)
@@ -61,6 +64,8 @@ int bookshelf_read(const char *aux_path, Netlist *nl)
     if (parse_nets(nets, nl, &names) < 0)
         goto fail;
     if (parse_pl(pl, nl, &names) < 0)
+        goto fail;
+    if (scl[0] && parse_scl(scl, nl) < 0)
         goto fail;
 
     strmap_free(&names);
