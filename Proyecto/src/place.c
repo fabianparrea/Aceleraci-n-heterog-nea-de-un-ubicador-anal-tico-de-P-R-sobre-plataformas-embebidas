@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "place.h"
 #include "wirelength.h"
 #include "density.h"
@@ -60,6 +61,12 @@ static float estimate_step(const float *v, const float *v_prev,
     return step;
 }
 
+// segundos entre dos marcas de CLOCK_MONOTONIC (tiempo de pared, no de CPU)
+static double elapsed_seconds(struct timespec t0, struct timespec t1)
+{
+    return (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) * 1e-9;
+}
+
 static int cmp_float(const void *a, const void *b)
 {
     float fa = *(const float *)a, fb = *(const float *)b;
@@ -88,8 +95,10 @@ static float calibrate_lambda(float *scratch, const float *grad_w, const float *
     return med_d > 1e-12f ? med_w / med_d : 1.0f;
 }
 
-void run_placement(Netlist *nl, float *out_overflow)
+void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
 {
+    struct timespec t0, t1;
+
     int n = nl->num_cells;
     int n2 = 2 * n;
 
@@ -119,7 +128,11 @@ void run_placement(Netlist *nl, float *out_overflow)
     // que entre densidad, en vez de dejarlas donde las trae el .pl (que en
     // estos benchmarks suele venir casi todo amontonado en un punto).
     netlist_get_positions(nl, st.v);
+    clock_gettime(CLOCK_MONOTONIC, &t0);
     initial_place(nl, st.v);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    if (out_timings)
+        out_timings->t_initial_place = elapsed_seconds(t0, t1);
     memcpy(st.u, st.v, n2 * sizeof(float));
     float gamma = gamma_max;
     float overflow = 1.0f;
@@ -171,6 +184,7 @@ void run_placement(Netlist *nl, float *out_overflow)
     float overflow_ref = overflow;
     const int ESCALATE_WINDOW = 300;
 
+    clock_gettime(CLOCK_MONOTONIC, &t0);
     for (int iter = 0; iter < MAX_ITERS; iter++) {
         compute_wirelength(nl, st.v, gamma, grad_w);
         compute_density(nl, &grid, st.v, grad_d, &overflow);
@@ -212,6 +226,9 @@ void run_placement(Netlist *nl, float *out_overflow)
         st.step = estimate_step(st.v, st.v_prev, grad, st.grad_prev, n2, max_step, st.step);
         nesterov_step(&st, grad);
     }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    if (out_timings)
+        out_timings->t_nesterov = elapsed_seconds(t0, t1);
 
     netlist_set_positions(nl, best_score < DBL_MAX ? best_u : st.u);
     if (out_overflow)

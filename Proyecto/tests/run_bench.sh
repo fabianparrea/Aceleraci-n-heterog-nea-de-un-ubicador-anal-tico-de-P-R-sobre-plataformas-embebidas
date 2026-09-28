@@ -57,10 +57,14 @@ for run in $(seq 1 "$RUNS"); do
     TMP_PERF=$(mktemp)
     TMP_STDOUT=$(mktemp)
 
-    # Ejecutar perf stat desde el directorio del benchmark
+    # Ejecutar perf stat desde el directorio del benchmark. LC_NUMERIC=C fuerza
+    # el punto decimal: con un locale que usa coma (es_ES, es_CR, etc.) el "-x,"
+    # de perf escribe valores como task-clock en formato "606905,73", y como el
+    # separador de columnas tambien es la coma, eso parte el numero en dos
+    # campos y corrompe la fila entera.
     (
         cd "$BENCH_DIR"
-        perf stat -x, \
+        LC_NUMERIC=C perf stat -x, \
                   -e "$EVENTS" \
                   -o "$TMP_PERF" \
                   "$EXECUTABLE" "$BENCH_FILE" > "$TMP_STDOUT" 2>&1
