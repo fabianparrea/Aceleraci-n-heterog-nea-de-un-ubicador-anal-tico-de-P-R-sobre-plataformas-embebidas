@@ -398,7 +398,9 @@ make
 
 ## Reconocimiento
 
-Como método de transparencia se reporta el uso de Inteligencia Artificial como herramienta de apoyo para el desarrollo, prueba e implementación del presente proyecto.
+Como método de transparencia se reporta el uso de Inteligencia Artificial como herramienta de apoyo para el desarrollo, prueba e implementación del presente proyecto. También se incluye un .md sobre el uso de IA por medio de Claude Code, esto debido a la imposiblidad de compartir links en Claude Code
 
 [Conversación 1](https://share.gemini.google/XbA8yWkuS4I4)
+
+[Conversación 2](https://claude.ai/share/0c3570e5-24fa-414d-b502-ecb8afe9f648).
 
