@@ -420,3 +420,4 @@ Como método de transparencia se reporta el uso de Inteligencia Artificial como 
 
 [Conversación 2](https://claude.ai/share/0c3570e5-24fa-414d-b502-ecb8afe9f648).
 
+[Conversación 3](https://chatgpt.com/share/6ab9f86e-1044-83e8-a550-bcb48bb35e09)
