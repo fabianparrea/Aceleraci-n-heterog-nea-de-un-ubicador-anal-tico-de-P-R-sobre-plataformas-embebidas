@@ -1,23 +1,66 @@
 # Aceleración heterogénea de un ubicador analítico de P&R sobre plataformas embebidas
 
-Fiorela Chavarría · Fabián Parreaguirre · Brayan Rodríguez
+Ubicador analítico de código abierto para circuitos integrados (ASIC) desarrollado en C con aceleración multihilo (OpenMP). Inspirado en las arquitecturas de **RePlAce** y **OpenPARF**, diseñado para ejecutar el pipeline completo de Place and Route (P&R).
+
+------------
+
+## Integrantes, curso y profesor
+
+### Integrantes
+
+1. Fiorela Chavarría Castrillo
+2. Fabián Parreaguirre Hidalgo
+3. Brayan Rodríguez Villalobos
+
+### Curso
+
+Introducción a la Computación Heterogénea - EL-5859
+
+### Profesor
+
+Dr. Luis G. León-Vega
+
+------------------------
+
+
+## Requisitos
+
+``` bash
+sudo apt-get update && sudo apt-get install -y build-essential gcc make libomp-dev python3-pandas python3-tabulate
+``` 
+
+## Compilación
+
+``` bash
+make
+```
+
+
+# Ejecutar un benchmark de prueba (ej. adaptec1)
+
+``` bash
+./build/placer bench/ispd2005/adaptec1.aux
+```
 
 ## Etapas del prototipo
 
-Prototipo completo en CPU: parser, wirelength, densidad, Nesterov, legalización y
-salida (issues #1-#6). Cada etapa sigue el diseño de **RePlAce** u **OpenPARF** según
+### Prototipo completo en CPU: 
+
+![Pipeline de P&R](/Proyecto/assets/graph.svg)
+
+parser, wirelength, densidad, Nesterov, legalización y
+salida. Cada etapa sigue el diseño de **RePlAce** u **OpenPARF** según
 cuál de los dos resuelve ese problema de forma más simple o más cercana a lo que
-necesitábamos; se indica la referencia y el cambio frente a ella.
+requerido.
 
 **#1 — Estructuras y firmas.** Structs del circuito (celdas, redes, pines) y los
 headers de cada módulo. Sigue a **RePlAce**: celda con posición y bandera de "fija",
 pin como desplazamiento respecto al centro de su celda — modelo de ASIC, sin los
 conceptos de FPGA (sites, recursos, clock regions) de OpenPARF.
 
-**#2 — Parser de bookshelf.** Lee `.aux`, `.nodes`, `.nets`, `.pl` y `.scl` a mano,
-línea por línea. Sigue a **OpenPARF**, el único de los dos con lector de bookshelf
-(RePlAce solo lo escribe); ellos usan un generador de parsers (flex/bison), aquí se
-hizo directo.
+**#2 — Parser de bookshelf.** Lee `.aux`, `.nodes`, `.nets`, `.pl` y `.scl` 
+línea por línea. Sigue a **OpenPARF**, el único de los dos con lector de bookshelf;
+dado que RePlAce solo lo escribe, usa un generador de parsers (flex/bison) en su lugar.
 
 **#3 — Wirelength.** HPWL exacto más una versión suavizada con gradiente para el
 descenso posterior. Mismo patrón de **OpenPARF**: el HPWL exacto va separado de la
@@ -28,14 +71,14 @@ celdas y hacia dónde empujarlas) con una transformada DCT propia, no la de
 **RePlAce** (~8000 líneas de otro autor). El modelo de overlap es igual en RePlAce y
 OpenPARF.
 
-**#5 — Nesterov y control de densidad.** Ciclo que combina wirelength y densidad y
+**#5 — Nesterov y control de densidad.** Ciclo que combina wirelength y densidad;
 mueve las celdas con el método de gradiente acelerado de Nesterov, siguiendo las
-reglas de **RePlAce** para el peso de densidad (`lambda`) y el ajuste del paso — más
+reglas de **RePlAce** para el peso de densidad (`lambda`) y el ajuste del paso, más
 simples que las de OpenPARF. Como Nesterov no garantiza que el HPWL baje en cada
 iteración, se conserva el mejor punto visto, no el último. `lambda` se recalibra con
 un promedio móvil (en vez de la proporción cruda de cada iteración) y con una
-escalada activa si el overflow no mejora en una ventana de 300 iteraciones — ninguna
-de las dos referencias lo necesita porque no arrancan del mismo initial placement.
+escalada activa si el overflow no mejora en una ventana de 300 iteraciones (ninguna
+de las dos referencias lo necesita porque no arrancan del mismo initial placement).
 
 **#6 — Legalización y salida.** Initial placement propio por mínimos cuadrados
 (gradiente conjugado, cada red como un resorte) antes de correr densidad, porque el
@@ -47,24 +90,25 @@ legalizador estándar en ubicadores analíticos, no un rasgo distintivo de RePlA
 de OpenPARF. Se agregan métricas (overflow, utilización, tiempo de pared) y una
 visualización PPM propia sin dependencias.
 
-Probado con los 4 circuitos reales de siempre: `adaptec1`, `adaptec2` y `bigblue1`
-(ISPD 2005) y `newblue1` (ISPD 2006), de 211 a 330 mil celdas.
+Se prueba con 4 circuitos: `adaptec1`, `adaptec2` y `bigblue1`
+(ISPD 2005) y `newblue1` (ISPD 2006), de 211 a 330 mil celdas. Estos circuitos forman parte de un set estandarizado de circuitos digitales que están disponibles gracias a la ISPD(International Symposium on Physical Design).
 
-## Qué hay en cada carpeta
 
-- **`include/`** y **`src/`** — un módulo por responsabilidad: `netlist`,
+## Organización de los módulos
+
+- **`include/`** y **`src/`** contienen un módulo por responsabilidad: `netlist`,
   `bookshelf` (+ `_nodes`, `_nets`, `_pl`, `_scl`), `wirelength`, `density`, `dct`,
   `grid`, `optimizer`, `initial_place`, `legalize`, `viz`, el ciclo `place` y
   `main`, más dos ayudas internas (`lineio`, `strmap`).
-- **`tests/`** — una prueba por módulo, se corren con `make test`. Los casos de
+- **`tests/`** contiene una prueba por módulo, se corren con `make test`. Los casos de
   `initial_place` y `legalize` están verificados a mano (dos resortes iguales se
   encuentran a medio camino, dos celdas con el mismo destino se reparten
   simétricamente), igual que el HPWL=73 del circuito de juguete.
-- **`bench/`** — `toy/` (inventado, resultado calculado a mano), `ispd2005/`
+- **`bench/`** contiene `toy/` (inventado, resultado calculado a mano), `ispd2005/`
   (`adaptec1`, `adaptec2`, `bigblue1`) e `ispd2006/` (`newblue1`).
-- **`build/`** — lo que genera `make`. No se sube a git, se borra con `make clean`.
+- **`build/`** contiene lo que genera `make`.
 
-## Cómo probarlo
+## Pruebas
 
 ```bash
 cd Proyecto
@@ -79,6 +123,10 @@ make
 Cada corrida imprime progreso cada 100 iteraciones y al final deja dos archivos junto
 al benchmark: `<circuito>.out.pl` (posiciones finales, formato bookshelf) y
 `<circuito>.ppm` (imagen del layout, celdas movibles en azul y fijas en rojo).
+
+A continuación se presenta cómo se visualiza el archivo `adaptec1.ppm`
+
+![adaptec1.ppm](./Proyecto/assets/adaptec1.png)
 
 ## Resultados
 
@@ -96,20 +144,22 @@ Promediando `adaptec1`, `adaptec2` y `bigblue1`: ~2.16x el HPWL de RePlAce, razo
 para un prototipo académico sin el ajuste fino de un ubicador de producción.
 `newblue1` es la excepción: en ese circuito el overflow cruza el objetivo antes de
 que wirelength tenga tiempo de acomodarse, y el HPWL final queda muy por encima del
-resto — limitación conocida del control de densidad actual (ver **#5**), pendiente
+resto, limitación conocida del control de densidad actual (ver **#5**), pendiente
 de ajuste.
+
+
+
 
 ### ¿Por qué no se compara contra OpenPARF?
 
 Porque no mide lo mismo. OpenPARF ubica para FPGA (sites, LUTs, BRAMs, recursos
 heterogéneos), no para ASIC estándar como estos benchmarks ISPD; su HPWL no es
-comparable con el nuestro. RePlAce sí: mismo modelo de ASIC, mismos benchmarks.
+comparable contra esta propuesta. RePlAce sí: mismo modelo de ASIC, mismos benchmarks.
 
 ## Optimizaciones
 
 Se probó paralelismo por tareas (OpenMP), banderas del compilador y alineación de
-memoria. Cada una se midió aparte antes de dejarla — varias que en teoría debían
-ayudar salían más lentas medidas, y se descartaron en vez de forzarlas.
+memoria. Cada una se midió aparte antes de aprobarla. Varias de las opciones que teoricamente podían brindar mejores resultados demostraron resultados más deficientes y fueron descartadas en lugar de forzarlas.
 
 **Aplicadas:**
 
@@ -128,7 +178,7 @@ ayudar salían más lentas medidas, y se descartaron en vez de forzarlas.
 
 - Paralelizar el campo eléctrico, el escalado de Poisson y las sumas de
   energía/overflow: cada bin hace muy poco trabajo (una resta, una división), y
-  abrir un bloque paralelo ahí salió medido más lento que en serie.
+  abrir un bloque paralelo demostró ser más lento que en serie.
 - Reordenar los structs de celdas (arreglo-de-structs a struct-de-arreglos): el
   costo real está en la grilla y el DCT, no en recorrer celdas.
 
@@ -146,7 +196,12 @@ La mejora es más modesta que en microbenchmarks aislados porque el pipeline
 completo incluye partes sin paralelizar (initial placement por gradiente
 conjugado, legalización) que ahora pesan una fracción real del tiempo total.
 
-## Salida de los benchmarks
+<details>
+<summary><b> Salida de los benchmarks (Haz clic para desplegar)</b></summary>
+
+<br>
+
+
 
 ```
 $ ./build/placer bench/ispd2005/adaptec1.aux
@@ -231,10 +286,119 @@ posiciones finales: newblue1.out.pl
 imagen del layout: newblue1.ppm
 ```
 
-## Qué falta
+</details>
 
-Perfilado por etapa con muestras estadísticamente significativas, en al menos dos
-computadoras y un sistema empotrado (pendiente, se deja para después). Ajustar el
-control de `lambda` para el caso de `newblue1`. Con eso resuelto, la aceleración en
-GPU es el siguiente paso, sin agregar funciones nuevas, solo haciendo correr más
-rápido lo que ya funciona.
+## Perfilado
+
+Se desarrolló un script de bash `run_bench.sh` ubicado en la carpeta `tests` que corre el programa una cantidad determinada de veces y genera un archivo csv con los siguientes datos:
+
+- task-clock
+- cycles
+- instructions
+- cache-references
+- cache-misses
+- L1-dcache-loads
+- L1-dcache-load-misses
+- LLC-loads
+- LLC-load-misses
+- branch-instructions
+- branch-misses
+
+
+Luego se utiliza un script de Python, que requiere de la biblioteca `pandas`, para hacer un análisis estadístico y presentar los datos como una tabla.
+
+### Ejecución
+
+``` bash 
+cd Proyecto/tests
+chmod +x run_bench.sh
+./run_bench.sh <número de iteraciones> <dirección del archivo .aux>
+```
+
+Por ejemplo:
+
+``` bash 
+cd Proyecto/tests
+chmod +x run_bench.sh
+./run_bench.sh 5 bench/ispd2005/adaptec1.aux
+```
+
+
+### Resultados
+
+Se ejecutó estas pruebas en las computadoras de Brayan y Fabián. Hace falta ejecutarlo en un sistema empotrado debido a que no se logró accesar en el momento requerido.
+
+#### Resultados de Brayan
+
+
+### Resumen de Desempeño y Muestreo de Hardware (`perf`)
+
+| Benchmark   | Time (s)         |   Cycles (M) |    Inst (M) |   IPC | Cache Miss %   | Branch Miss %   |
+|:------------|:-----------------|-------------:|------------:|------:|:---------------|:----------------|
+| adaptec1    | 414.293 ± 3.342  |  1.57013e+06 | 1.54764e+06 | 0.986 | 1.16%          | 4.23%           |
+| adaptec2    | 475.144 ± 1.918  |  1.79676e+06 | 1.74616e+06 | 0.972 | 1.48%          | 4.48%           |
+| bigblue1    | 513.390 ± 3.691  |  1.94044e+06 | 1.85835e+06 | 0.958 | 1.69%          | 4.69%           |
+| newblue1    | 472.912 ± 17.194 |  1.81746e+06 | 1.73752e+06 | 0.956 | 1.64%          | 5.07%           |
+
+
+
+#### Resultados de Fabián
+
+
+### Resumen de Desempeño y Muestreo de Hardware (`perf`)
+
+| Benchmark   | Time (s)         |   Cycles (M) |    Inst (M) |   IPC | Cache Miss %   | Branch Miss %   |
+|:------------|:-----------------|-------------:|------------:|------:|:---------------|:----------------|
+| adaptec1    | 592.400 ± 8.791  |  1.49059e+06 | 1.49045e+06 | 1     | 29.61%         | 4.28%           |
+| adaptec2    | 646.577 ± 4.157  |  1.64634e+06 | 1.68465e+06 | 1.023 | 30.17%         | 4.55%           |
+| bigblue1    | 673.682 ± 1.223  |  1.72824e+06 | 1.79431e+06 | 1.038 | 29.62%         | 4.73%           |
+| newblue1    | 597.647 ± 14.440 |  1.54517e+06 | 1.65695e+06 | 1.072 | 32.42%         | 4.92%           |
+
+
+
+## Dependencias
+
+Se tienen algunas dependencias externas que son manejadas por el archivo `Makefile` y están incluídas en el toolchain de C en linux.
+
+- GCC o Clang para compilar el código en C
+- `make` para ejecutar la construcción
+- `libm` para funciones matemáticas (`sqrt`, `fabs`, etc.)
+- OpenMP (con la bandera `-fopenmp`) para la paralelización del cálculo de densidad y optimización
+- Bibliotecas estándar del sistema: `stdio.h`, `stdlib.h`, `string.h`, `math.h`, `time.h`
+- Pyhton3 y la biblioteca `pandas` para generar la tabla de resumen de desempeño
+
+
+Si al ejecutar el comando `make` no se logra compilar por falta de herramientas, puedes instalarlas con:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential gcc make libomp-dev
+```
+
+Luego, desde la carpeta del proyecto:
+
+```bash
+cd Proyecto
+make
+```
+
+## Características de los sistemas
+
+
+| # | Characteristic | Fabián | Brayan | Fiorela |
+|---|---|---|---|---|
+| 1 | Processor model | Intel Core i5-1135G7 @ 2.40GHz (11th gen) | AMD A12-9800 RADEON R7, 12 Compute Cores 4C+8G | Intel Core i5-6300U @ 2.40GHz |
+| 2 | Architecture | x86_64 | x86_64 | x86_64 |
+| 3 | Physical cores | 4 | 4 | 2 |
+| 4 | Logical CPUs | 8 | 4 | 4 |
+| 5 | Threads per core | 2 (Hyperthreading) | 1 | 2 (Hyperthreading) |
+| 6 | Compiler | GCC 15.2.0 (GNU11 + OpenMP) | GCC 15.2.0 (GNU11 + OpenMP) | GCC 15.2.0 (GNU11 + OpenMP) |
+
+
+
+## Reconocimiento
+
+Como método de transparencia se reporta el uso de Inteligencia Artificial como herramienta de apoyo para el desarrollo, prueba e implementación del presente proyecto.
+
+[Conversación 1](https://share.gemini.google/XbA8yWkuS4I4)
+
