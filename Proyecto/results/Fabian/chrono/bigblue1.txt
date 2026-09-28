@@ -1,0 +1,18 @@
+celdas: 278164  redes: 284479  pines: 1144691
+utilizacion: 58.3%
+HPWL inicial: 1.105385e+08
+  iter    0: HPWL 7.1163e+07  overflow 0.816
+  iter  100: HPWL 6.8914e+07  overflow 0.765
+  iter  200: HPWL 6.9576e+07  overflow 0.757
+  iter  300: HPWL 6.9969e+07  overflow 0.753
+  iter  400: HPWL 7.0168e+07  overflow 0.752
+  iter  500: HPWL 7.0352e+07  overflow 0.749
+  iter  600: HPWL 7.0631e+07  overflow 0.747
+  iter  700: HPWL 9.6230e+07  overflow 0.507
+  iter  800: HPWL 1.1765e+08  overflow 0.193
+  iter  900: HPWL 1.1482e+08  overflow 0.198
+HPWL sin legalizar: 1.136869e+08  overflow: 0.198  tiempo: 182.5 s
+HPWL legalizado: 1.300526e+08
+posiciones finales: bigblue1.out.pl
+imagen del layout: bigblue1.ppm
+tiempos por etapa (s): parseo=1.0277  initial_place=1.9581  nesterov=180.2769  legalizacion=0.9255  escritura=0.2188

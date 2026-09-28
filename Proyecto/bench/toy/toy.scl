@@ -1,0 +1,104 @@
+UCLA scl 1.0
+# filas de prueba para el toy, hechas a mano (calzan con las celdas de toy.pl)
+
+NumRows : 11
+
+CoreRow Horizontal
+  Coordinate    :   0
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
+CoreRow Horizontal
+  Coordinate    :   2
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
+CoreRow Horizontal
+  Coordinate    :   4
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
+CoreRow Horizontal
+  Coordinate    :   6
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
+CoreRow Horizontal
+  Coordinate    :   8
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
+CoreRow Horizontal
+  Coordinate    :   10
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
+CoreRow Horizontal
+  Coordinate    :   12
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
+CoreRow Horizontal
+  Coordinate    :   14
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
+CoreRow Horizontal
+  Coordinate    :   16
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
+CoreRow Horizontal
+  Coordinate    :   18
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
+CoreRow Horizontal
+  Coordinate    :   20
+  Height        :   2
+  Sitewidth     :    1
+  Sitespacing   :    1
+  Siteorient    :    1
+  Sitesymmetry  :    1
+  SubrowOrigin  :    0	NumSites  :  21
+End
