@@ -354,6 +354,22 @@ Se ejecutó estas pruebas en las computadoras de Brayan y Fabián. Hace falta ej
 | bigblue1    | 673.682 ± 1.223  |  1.72824e+06 | 1.79431e+06 | 1.038 | 29.62%         | 4.73%           |
 | newblue1    | 597.647 ± 14.440 |  1.54517e+06 | 1.65695e+06 | 1.072 | 32.42%         | 4.92%           |
 
+### Perfilado por etapa
+
+Para identificar qué parte del pipeline conviene acelerar primero, se instrumentó el código con `clock_gettime` alrededor de cada etapa: parseo, initial placement, ciclo de Nesterov, legalización y escritura. Se realizó una corrida por circuito.
+
+Se confirma que el ciclo de Nesterov domina más del *95 %* del tiempo total en los cuatro circuitos. Esto valida la decisión de acelerar precisamente estos dos núcleos en la arquitectura propuesta.
+
+#### Tiempo de pared por etapa
+
+| Circuito   | Parseo (s) | Init. (s) | Nesterov (s) | Legal. (s) | Escr. (s) |
+| :--------- | ---------: | --------: | -----------: | ---------: | --------: |
+| `adaptec1` |       0.78 |      1.38 |       137.13 |       0.66 |      0.18 |
+| `adaptec2` |       0.89 |      1.83 |       165.18 |       1.09 |      0.22 |
+| `bigblue1` |       1.03 |      1.96 |       180.28 |       0.93 |      0.22 |
+| `newblue1` |       1.10 |      2.17 |       170.37 |       5.90 |      0.25 |
+
+**Observación:** el ciclo de Nesterov representa más del 95 % del tiempo de ejecución en todos los circuitos evaluados, por lo que constituye el principal candidato para la aceleración. Dentro de este ciclo, los cálculos de longitud de cable y densidad son los núcleos seleccionados para la arquitectura propuesta.
 
 
 ## Dependencias
