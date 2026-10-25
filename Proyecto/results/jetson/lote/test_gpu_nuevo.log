@@ -1,0 +1,13 @@
+gcc -std=gnu11 -O3 -fopenmp -Wall -Wextra -MMD -MP -Iinclude tests/test_gpu.c build/grid.o build/initial_place.o build/density.o build/bookshelf_nets.o build/viz.o build/bookshelf_nodes.o build/bookshelf_scl.o build/wirelength.o build/lineio.o build/legalize.o build/bookshelf_pl.o build/netlist.o build/prof.o build/bookshelf.o build/dct.o build/optimizer.o build/place.o build/strmap.o build/gpu/backend.o build/gpu/gpu.o build/gpu/dct_gpu.o build/gpu/density_gpu.o build/gpu/wirelength_gpu.o -o build/gpu/test_gpu -lm -fopenmp -L/usr/local/cuda/lib64 -Wl,-rpath,/usr/local/cuda/lib64 -lcufft -lcudart -lstdc++
+./build/gpu/test_gpu
+  dct  16x16   error ida 7.2e-08  vuelta 8.5e-08
+  dct  64x64   error ida 9.2e-08  vuelta 1.5e-07
+  dct 256x256  error ida 1.2e-07  vuelta 1.6e-07
+  dct 512x512  error ida 1.2e-07  vuelta 1.8e-07
+  netlist sintetico: 200000 celdas, 210000 redes, 1224474 pines, grilla 256x256
+GPU: NVIDIA Tegra X1 (sm_53, 1 SM), lista en 0.04 s
+  wirelength gamma=8.0     error total 2.7e-09  gradiente 5.0e-08
+  wirelength gamma=159.9   error total 3.5e-09  gradiente 7.7e-08
+  wirelength con celdas lejos         gradiente 4.9e-08
+  densidad   overflow cpu 5.919556 gpu 5.919556  error energia 1.1e-07  gradiente 3.0e-06
+test_gpu: ok

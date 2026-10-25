@@ -2,6 +2,7 @@
 #include <string.h>
 #include "density.h"
 #include "dct.h"
+#include "prof.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -129,8 +130,11 @@ static void compute_field(Grid *grid)
 double compute_density(const Netlist *nl, Grid *grid, const float *v,
                        float *grad, float *overflow)
 {
+    double mark = prof_now();
     splat_density(nl, grid, v);
+    mark = prof_lap(PROF_SPLAT, mark);
     solve_poisson(grid);
+    mark = prof_lap(PROF_POISSON, mark);
     compute_field(grid);
 
     // estas dos sumas tambien se probaron en paralelo (son reducciones
@@ -154,6 +158,7 @@ double compute_density(const Netlist *nl, Grid *grid, const float *v,
     // grid_init en vez de sumarla de nuevo en cada llamada.
     if (overflow)
         *overflow = grid->movable_area > 0 ? (float)(over / grid->movable_area) : 0.0f;
+    mark = prof_lap(PROF_FIELD, mark);
 
     if (grad) {
         memset(grad, 0, 2 * (size_t)nl->num_cells * sizeof(float));
@@ -194,5 +199,6 @@ double compute_density(const Netlist *nl, Grid *grid, const float *v,
             grad[n + i] = (float)gy;
         }
     }
+    prof_lap(PROF_DENSITY_GRAD, mark);
     return energy;
 }

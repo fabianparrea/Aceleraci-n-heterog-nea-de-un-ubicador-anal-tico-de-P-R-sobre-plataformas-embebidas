@@ -1,0 +1,7 @@
+mkdir -p build/gpu
+gcc -std=gnu11 -O3 -fopenmp -Wall -Wextra -MMD -MP -Iinclude -DUSE_CUDA -c src/backend.c -o build/gpu/backend.o
+/usr/local/cuda/bin/nvcc -O3 -arch=sm_53 -Iinclude -c src/dct_gpu.cu -o build/gpu/dct_gpu.o
+/usr/local/cuda/bin/nvcc -O3 -arch=sm_53 -Iinclude -c src/density_gpu.cu -o build/gpu/density_gpu.o
+/usr/local/cuda/bin/nvcc -O3 -arch=sm_53 -Iinclude -c src/gpu.cu -o build/gpu/gpu.o
+/usr/local/cuda/bin/nvcc -O3 -arch=sm_53 -Iinclude -c src/wirelength_gpu.cu -o build/gpu/wirelength_gpu.o
+gcc build/main.o build/grid.o build/density.o build/place.o build/legalize.o build/bookshelf_nets.o build/initial_place.o build/prof.o build/netlist.o build/bookshelf_nodes.o build/bookshelf_scl.o build/viz.o build/bookshelf.o build/wirelength.o build/dct.o build/optimizer.o build/lineio.o build/strmap.o build/bookshelf_pl.o build/gpu/backend.o build/gpu/dct_gpu.o build/gpu/density_gpu.o build/gpu/gpu.o build/gpu/wirelength_gpu.o -o build/placer_gpu -lm -fopenmp -L/usr/local/cuda/lib64 -Wl,-rpath,/usr/local/cuda/lib64 -lcufft -lcudart -lstdc++

@@ -1,0 +1,4 @@
+adaptec1 antes: carga=0.32 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=43 CPU-therm=38 GPU-therm=37 PLL-therm=35 PMIC-Die=50 thermal-fan-est=37  | despues: temp: AO-therm=52 CPU-therm=46 GPU-therm=46 PLL-therm=44 PMIC-Die=50 thermal-fan-est=46 
+adaptec2 antes: carga=1.65 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=50 CPU-therm=44 GPU-therm=44 PLL-therm=42 PMIC-Die=50 thermal-fan-est=44  | despues: temp: AO-therm=55 CPU-therm=49 GPU-therm=48 PLL-therm=46 PMIC-Die=50 thermal-fan-est=48 
+bigblue1 antes: carga=1.33 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=53 CPU-therm=46 GPU-therm=47 PLL-therm=44 PMIC-Die=50 thermal-fan-est=46  | despues: temp: AO-therm=55 CPU-therm=50 GPU-therm=49 PLL-therm=47 PMIC-Die=50 thermal-fan-est=49 
+newblue1 antes: carga=1.43 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=54 CPU-therm=48 GPU-therm=48 PLL-therm=46 PMIC-Die=50 thermal-fan-est=47  | despues: temp: AO-therm=54 CPU-therm=47 GPU-therm=48 PLL-therm=46 PMIC-Die=50 thermal-fan-est=48 

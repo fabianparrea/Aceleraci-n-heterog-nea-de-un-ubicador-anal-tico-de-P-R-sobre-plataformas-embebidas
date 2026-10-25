@@ -8,6 +8,7 @@
 #include "place.h"
 #include "legalize.h"
 #include "viz.h"
+#include "prof.h"
 
 // nombre del benchmark sin carpeta ni ".aux", para nombrar los archivos de salida
 static void base_name(const char *aux_path, char *out, size_t size)
@@ -113,6 +114,13 @@ int main(int argc, char **argv)
     printf("tiempos por etapa (s): parseo=%.4f  initial_place=%.4f  "
            "nesterov=%.4f  legalizacion=%.4f  escritura=%.4f\n",
            t_parseo, pt.t_initial_place, pt.t_nesterov, t_legalizacion, t_escritura);
+
+    // dentro del ciclo de Nesterov si hay mas de 100 muestras por etapa: una
+    // por iteracion, en un CSV aparte
+    snprintf(path, sizeof path, "%s.prof.csv", base);
+    if (prof_write_csv(path) == 0)
+        printf("perfil por iteracion: %s\n", path);
+    prof_reset();
 
     free(v);
     netlist_free(&nl);
