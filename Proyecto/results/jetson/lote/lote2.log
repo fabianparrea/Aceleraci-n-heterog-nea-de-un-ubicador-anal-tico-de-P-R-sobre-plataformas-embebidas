@@ -1,0 +1,39 @@
+inicio 2026-10-24T22:26:07-06:00, esperando el fin de cpu_quickselect_4t
+2026-10-24T23:08:49-06:00 termino la etapa de CPU con quickselect
+2026-10-24T23:08:53-06:00 lote viejo cortado antes de medir la GPU vieja
+gcc -std=gnu11 -O3 -fopenmp -Wall -Wextra -MMD -MP -Iinclude tests/test_gpu.c build/grid.o build/initial_place.o build/density.o build/bookshelf_nets.o build/viz.o build/bookshelf_nodes.o build/bookshelf_scl.o build/wirelength.o build/lineio.o build/legalize.o build/bookshelf_pl.o build/netlist.o build/prof.o build/bookshelf.o build/dct.o build/optimizer.o build/place.o build/strmap.o build/gpu/backend.o build/gpu/gpu.o build/gpu/dct_gpu.o build/gpu/density_gpu.o build/gpu/wirelength_gpu.o -o build/gpu/test_gpu -lm -fopenmp -L/usr/local/cuda/lib64 -Wl,-rpath,/usr/local/cuda/lib64 -lcufft -lcudart -lstdc++
+  dct  16x16   error ida 7.2e-08  vuelta 8.5e-08
+  dct  64x64   error ida 9.2e-08  vuelta 1.5e-07
+  dct 256x256  error ida 1.2e-07  vuelta 1.6e-07
+  dct 512x512  error ida 1.2e-07  vuelta 1.8e-07
+  wirelength gamma=8.0     error total 2.7e-09  gradiente 5.0e-08
+  wirelength gamma=159.9   error total 3.5e-09  gradiente 7.7e-08
+  densidad   overflow cpu 5.919556 gpu 5.919556  error energia 1.1e-07  gradiente 3.0e-06
+test_gpu: ok
+2026-10-24T23:09:08-06:00 prueba de GPU pasada; se mide la GPU
+==================================================
+ Config:   gpu (4 hilos)
+ Salida:   /home/el5859/grupo6/Aceleraci-n-heterog-nea-de-un-ubicador-anal-tico-de-P-R-sobre-plataformas-embebidas/Proyecto/results/jetson/gpu_4t
+==================================================
+[+] adaptec1  (carga=0.12 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=52 CPU-therm=46 GPU-therm=46 PLL-therm=44 thermal-fan-est=46 )
+    GPU: NVIDIA Tegra X1 (sm_53, 1 SM), lista en 1.15 s
+    HPWL legalizado: 1.547220e+08
+    tiempos por etapa (s): parseo=3.1480  initial_place=6.1495  nesterov=57.2542  legalizacion=3.4837  escritura=0.5633
+    temp: AO-therm=54 CPU-therm=48 GPU-therm=48 PLL-therm=46 thermal-fan-est=48 
+[+] adaptec2  (carga=0.36 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=52 CPU-therm=46 GPU-therm=46 PLL-therm=44 thermal-fan-est=46 )
+    GPU: NVIDIA Tegra X1 (sm_53, 1 SM), lista en 1.15 s
+    HPWL legalizado: 2.414435e+08
+    tiempos por etapa (s): parseo=3.6651  initial_place=7.5985  nesterov=72.8818  legalizacion=5.4530  escritura=0.7233
+    temp: AO-therm=54 CPU-therm=48 GPU-therm=48 PLL-therm=46 thermal-fan-est=48 
+[+] bigblue1  (carga=0.40 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=52 CPU-therm=46 GPU-therm=47 PLL-therm=44 thermal-fan-est=46 )
+    GPU: NVIDIA Tegra X1 (sm_53, 1 SM), lista en 1.13 s
+    HPWL legalizado: 1.303178e+08
+    tiempos por etapa (s): parseo=3.8216  initial_place=8.2708  nesterov=71.7409  legalizacion=4.6009  escritura=0.7636
+    temp: AO-therm=54 CPU-therm=48 GPU-therm=48 PLL-therm=46 thermal-fan-est=49 
+[+] newblue1  (carga=0.44 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=52 CPU-therm=46 GPU-therm=47 PLL-therm=44 thermal-fan-est=46 )
+    GPU: NVIDIA Tegra X1 (sm_53, 1 SM), lista en 1.10 s
+    HPWL legalizado: 1.538716e+09
+    tiempos por etapa (s): parseo=4.3769  initial_place=9.0859  nesterov=81.8961  legalizacion=17.7453  escritura=0.9139
+    temp: AO-therm=53 CPU-therm=48 GPU-therm=48 PLL-therm=45 thermal-fan-est=48 
+[+] listo: /home/el5859/grupo6/Aceleraci-n-heterog-nea-de-un-ubicador-anal-tico-de-P-R-sobre-plataformas-embebidas/Proyecto/results/jetson/gpu_4t
+gpu listo 2026-10-24T23:20:08-06:00

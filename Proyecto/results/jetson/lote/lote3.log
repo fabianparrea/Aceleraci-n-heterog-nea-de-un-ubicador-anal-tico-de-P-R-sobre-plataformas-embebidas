@@ -1,0 +1,9 @@
+==================================================
+ Config:   cpu (1 hilos)
+ Salida:   /home/el5859/grupo6/linea_base_cpu/results/jetson/cpu_base_1t
+==================================================
+[+] adaptec1  (carga=0.08 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=46 CPU-therm=40 GPU-therm=41 PLL-therm=38 thermal-fan-est=40 )
+    HPWL legalizado: 1.552268e+08
+    tiempos por etapa (s): parseo=3.0432  initial_place=6.1302  nesterov=1060.5637  legalizacion=3.4780  escritura=0.5504
+    temp: AO-therm=48 CPU-therm=44 GPU-therm=43 PLL-therm=40 thermal-fan-est=43 
+[+] listo: /home/el5859/grupo6/linea_base_cpu/results/jetson/cpu_base_1t

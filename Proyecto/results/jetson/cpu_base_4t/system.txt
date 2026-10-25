@@ -1,0 +1,16 @@
+fecha: 2026-10-24T21:59:54-06:00
+binario: /home/el5859/grupo6/linea_base_cpu/build/placer
+hilos (OMP_NUM_THREADS): 4
+Linux jetson-183 4.9.253-tegra #1 SMP PREEMPT Sat Feb 19 08:59:22 PST 2022 aarch64 aarch64 aarch64 GNU/Linux
+# R32 (release), REVISION: 7.1, GCID: 29818004, BOARD: t210ref, EABI: aarch64, DATE: Sat Feb 19 17:05:08 UTC 2022
+gcc (Ubuntu/Linaro 7.5.0-3ubuntu1~18.04) 7.5.0
+Build cuda_10.2_r440.TC440_70.29663091_0
+nucleos: 4
+frecuencias CPU (MHz): 1479 1479 1479 1479 
+frecuencia GPU (MHz): 921
+NVPM WARN: fan mode is not set!
+NV Power Mode: MAXN
+0
+NVPM ERROR: Error opening /sys/kernel/nvpmodel_emc_cap/emc_iso_cap: 13
+NVPM ERROR: failed to read PARAM EMC: ARG MAX_FREQ: PATH /sys/kernel/nvpmodel_emc_cap/emc_iso_cap
+version: 23c31e7 + instrumentacion por iteracion (sin cambios de algoritmo)

@@ -1,0 +1,5 @@
+==8642== NVPROF is profiling process 8642, command: /home/el5859/grupo6/Aceleraci-n-heterog-nea-de-un-ubicador-anal-tico-de-P-R-sobre-plataformas-embebidas/Proyecto/build/placer_gpu adaptec1.aux
+==8642== Warning: ERR_NVGPUCTRPERM - The user does not have permission to profile on the target device. See the following link for instructions to enable permissions and get more information: https://developer.nvidia.com/ERR_NVGPUCTRPERM 
+==8642== Profiling application: /home/el5859/grupo6/Aceleraci-n-heterog-nea-de-un-ubicador-anal-tico-de-P-R-sobre-plataformas-embebidas/Proyecto/build/placer_gpu adaptec1.aux
+==8642== Profiling result:
+No events/metrics were profiled.
