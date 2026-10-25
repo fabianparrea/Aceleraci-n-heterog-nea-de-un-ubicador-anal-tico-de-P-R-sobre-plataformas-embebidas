@@ -42,6 +42,26 @@ make
 ./build/placer bench/ispd2005/adaptec1.aux
 ```
 
+## Versión con GPU (Jetson Nano, CUDA)
+
+Se compila y se corre en la Jetson Nano. CUDA 10.2 y gcc 7.5 ya vienen con JetPack 4.6.
+
+``` bash
+cd Proyecto
+make gpu                                       # compila build/placer_gpu
+make test-gpu                                  # compara GPU contra CPU: debe terminar en "test_gpu: ok"
+./build/placer_gpu bench/ispd2005/adaptec1.aux
+```
+
+Para medir el tiempo de cada etapa (los benchmarks corren de a uno):
+
+``` bash
+sudo nvpmodel -m 0 && sudo jetson_clocks       # máximo rendimiento y relojes fijos
+tests/run_profile.sh cpu 4                     # solo CPU  -> results/jetson/cpu_4t/
+tests/run_profile.sh gpu 4                     # con GPU   -> results/jetson/gpu_4t/
+python3 tests/profile_report.py results/jetson/cpu_4t results/jetson/gpu_4t
+```
+
 ## Etapas del prototipo
 
 ### Prototipo completo en CPU: 
