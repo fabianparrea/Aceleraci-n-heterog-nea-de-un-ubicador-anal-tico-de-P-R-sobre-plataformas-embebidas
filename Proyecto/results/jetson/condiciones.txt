@@ -1,0 +1,16 @@
+fecha: 2026-10-24T22:01:08-06:00  (condiciones durante el lote de perfilado)
+# R32 (release), REVISION: 7.1, GCID: 29818004, BOARD: t210ref, EABI: aarch64, DATE: Sat Feb 19 17:05:08 UTC 2022
+NV Power Mode: MAXN
+0
+NVPM ERROR: Error opening /sys/kernel/nvpmodel_emc_cap/emc_iso_cap: 13
+NVPM ERROR: failed to read PARAM EMC: ARG MAX_FREQ: PATH /sys/kernel/nvpmodel_emc_cap/emc_iso_cap
+cpus en linea: 0-3
+cpu0 governor=schedutil min=1479 max=1479 actual=1479 MHz
+cpu1 governor=schedutil min=1479 max=1479 actual=1479 MHz
+cpu2 governor=schedutil min=1479 max=1479 actual=1479 MHz
+cpu3 governor=schedutil min=1479 max=1479 actual=1479 MHz
+gpu governor=nvhost_podgov min=921 max=921 actual=921 MHz
+emc (memoria): sin acceso
+gcc: gcc (Ubuntu/Linaro 7.5.0-3ubuntu1~18.04) 7.5.0
+nvcc: Build cuda_10.2_r440.TC440_70.29663091_0
+ 22:01:08 up 23 days,  6:59, 44 users,  load average: 2,02, 0,79, 0,31

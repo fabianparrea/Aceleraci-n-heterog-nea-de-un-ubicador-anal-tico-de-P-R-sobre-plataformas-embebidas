@@ -1,0 +1,1 @@
+2026-10-24T23:45:46-06:00 adaptec1 sha256=2853a532d0b09116 antes: carga=0.08 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=46 CPU-therm=40 GPU-therm=41 PLL-therm=38 thermal-fan-est=40  | despues: temp: AO-therm=48 CPU-therm=44 GPU-therm=43 PLL-therm=40 thermal-fan-est=43 

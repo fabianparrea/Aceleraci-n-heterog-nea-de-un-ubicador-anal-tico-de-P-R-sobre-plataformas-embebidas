@@ -1,0 +1,19 @@
+celdas: 255023  redes: 266009  pines: 1069482
+utilizacion: 77.7%
+HPWL inicial: 1.477710e+08
+  iter    0: HPWL 8.4744e+07  overflow 0.828
+  iter  100: HPWL 8.4637e+07  overflow 0.618
+  iter  200: HPWL 8.7802e+07  overflow 0.540
+  iter  300: HPWL 8.9785e+07  overflow 0.491
+  iter  400: HPWL 9.0821e+07  overflow 0.474
+  iter  500: HPWL 9.1566e+07  overflow 0.461
+  iter  600: HPWL 9.2170e+07  overflow 0.453
+  iter  700: HPWL 9.2607e+07  overflow 0.445
+  iter  800: HPWL 9.3051e+07  overflow 0.439
+  iter  900: HPWL 9.3558e+07  overflow 0.432
+HPWL sin legalizar: 9.399076e+07  overflow: 0.426  tiempo: 348.1 s
+HPWL legalizado: 2.461440e+08
+posiciones finales: adaptec2.out.pl
+imagen del layout: adaptec2.ppm
+tiempos por etapa (s): parseo=3.5499  initial_place=7.6461  nesterov=339.8210  legalizacion=5.4067  escritura=0.7100
+perfil por iteracion: adaptec2.prof.csv

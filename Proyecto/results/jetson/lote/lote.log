@@ -1,0 +1,48 @@
+inicio 2026-10-24T21:59:54-06:00
+==================================================
+ Config:   cpu (4 hilos)
+ Salida:   /home/el5859/grupo6/linea_base_cpu/results/jetson/cpu_base_4t
+==================================================
+[+] adaptec1  (carga=0.32 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=43 CPU-therm=38 GPU-therm=37 PLL-therm=35 PMIC-Die=50 thermal-fan-est=37 )
+    HPWL legalizado: 1.548540e+08
+    tiempos por etapa (s): parseo=3.1025  initial_place=6.1379  nesterov=545.1989  legalizacion=3.4569  escritura=0.5701
+    temp: AO-therm=52 CPU-therm=46 GPU-therm=46 PLL-therm=44 PMIC-Die=50 thermal-fan-est=46 
+[+] adaptec2  (carga=1.65 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=50 CPU-therm=44 GPU-therm=44 PLL-therm=42 PMIC-Die=50 thermal-fan-est=44 )
+    HPWL legalizado: 2.433214e+08
+    tiempos por etapa (s): parseo=3.6385  initial_place=7.5903  nesterov=631.3253  legalizacion=5.4064  escritura=0.6768
+    temp: AO-therm=55 CPU-therm=49 GPU-therm=48 PLL-therm=46 PMIC-Die=50 thermal-fan-est=48 
+[+] bigblue1  (carga=1.33 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=53 CPU-therm=46 GPU-therm=47 PLL-therm=44 PMIC-Die=50 thermal-fan-est=46 )
+    HPWL legalizado: 1.303377e+08
+    tiempos por etapa (s): parseo=3.9023  initial_place=8.2600  nesterov=660.1854  legalizacion=4.5245  escritura=0.7241
+    temp: AO-therm=55 CPU-therm=50 GPU-therm=49 PLL-therm=47 PMIC-Die=50 thermal-fan-est=49 
+[+] newblue1  (carga=1.43 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=54 CPU-therm=48 GPU-therm=48 PLL-therm=46 PMIC-Die=50 thermal-fan-est=47 )
+    HPWL legalizado: 1.557876e+09
+    tiempos por etapa (s): parseo=4.2926  initial_place=9.0716  nesterov=621.3518  legalizacion=25.2087  escritura=0.8939
+    temp: AO-therm=54 CPU-therm=47 GPU-therm=48 PLL-therm=46 PMIC-Die=50 thermal-fan-est=48 
+[+] listo: /home/el5859/grupo6/linea_base_cpu/results/jetson/cpu_base_4t
+==================================================
+ Config:   cpu (4 hilos)
+ Salida:   /home/el5859/grupo6/Aceleraci-n-heterog-nea-de-un-ubicador-anal-tico-de-P-R-sobre-plataformas-embebidas/Proyecto/results/jetson/cpu_quickselect_4t
+==================================================
+[+] adaptec1  (carga=1.83 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=54 CPU-therm=49 GPU-therm=48 PLL-therm=46 PMIC-Die=50 thermal-fan-est=48 )
+    HPWL legalizado: 1.548576e+08
+    tiempos por etapa (s): parseo=3.0226  initial_place=6.1459  nesterov=309.9673  legalizacion=3.4856  escritura=0.5582
+    temp: AO-therm=58 CPU-therm=53 GPU-therm=51 PLL-therm=49 PMIC-Die=50 thermal-fan-est=52 
+[+] adaptec2  (carga=2.07 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=56 CPU-therm=50 GPU-therm=50 PLL-therm=48 PMIC-Die=50 thermal-fan-est=49 )
+    HPWL legalizado: 2.461440e+08
+    tiempos por etapa (s): parseo=3.5499  initial_place=7.6461  nesterov=339.8210  legalizacion=5.4067  escritura=0.7100
+    temp: AO-therm=59 CPU-therm=54 GPU-therm=52 PLL-therm=50 PMIC-Die=50 thermal-fan-est=53 
+[+] bigblue1  (carga=2.09 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=57 CPU-therm=51 GPU-therm=51 PLL-therm=49 PMIC-Die=50 thermal-fan-est=50 )
+    HPWL legalizado: 1.303436e+08
+    tiempos por etapa (s): parseo=3.8831  initial_place=8.2763  nesterov=365.7580  legalizacion=4.5783  escritura=0.7586
+    temp: AO-therm=60 CPU-therm=55 GPU-therm=53 PLL-therm=51 PMIC-Die=50 thermal-fan-est=54 
+[+] newblue1  (carga=2.01 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=58 CPU-therm=51 GPU-therm=52 PLL-therm=49 PMIC-Die=50 thermal-fan-est=51 )
+    HPWL legalizado: 1.486073e+09
+    tiempos por etapa (s): parseo=4.2659  initial_place=9.1115  nesterov=298.9023  legalizacion=22.0619  escritura=0.9004
+    temp: AO-therm=59 CPU-therm=53 GPU-therm=53 PLL-therm=51 PMIC-Die=50 thermal-fan-est=53 
+[+] listo: /home/el5859/grupo6/Aceleraci-n-heterog-nea-de-un-ubicador-anal-tico-de-P-R-sobre-plataformas-embebidas/Proyecto/results/jetson/cpu_quickselect_4t
+==================================================
+ Config:   gpu (4 hilos)
+ Salida:   /home/el5859/grupo6/Aceleraci-n-heterog-nea-de-un-ubicador-anal-tico-de-P-R-sobre-plataformas-embebidas/Proyecto/results/jetson/gpu_4t
+==================================================
+[+] adaptec1  (carga=2.57 cpu_mhz=1479 1479 1479 1479 temp: AO-therm=59 CPU-therm=53 GPU-therm=52 PLL-therm=51 PMIC-Die=50 thermal-fan-est=53 )

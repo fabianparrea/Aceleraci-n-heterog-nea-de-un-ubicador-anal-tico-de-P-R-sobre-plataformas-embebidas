@@ -1,0 +1,18 @@
+celdas: 330474  redes: 338901  pines: 1244342
+utilizacion: 69.9%
+HPWL inicial: 2.377696e+07
+  iter    0: HPWL 4.8029e+07  overflow 0.691
+  iter  100: HPWL 8.2336e+07  overflow 0.399
+  iter  200: HPWL 4.4740e+08  overflow 0.114
+  iter  300: HPWL 6.8699e+08  overflow 0.056
+  iter  400: HPWL 4.7107e+08  overflow 0.072
+  iter  500: HPWL 9.3511e+08  overflow 0.141
+  iter  600: HPWL 3.8893e+08  overflow 0.143
+  iter  700: HPWL 2.7357e+08  overflow 0.127
+  iter  800: HPWL 1.9168e+08  overflow 0.142
+HPWL sin legalizar: 5.279091e+07  overflow: 0.447  tiempo: 631.5 s
+HPWL legalizado: 1.557876e+09
+posiciones finales: newblue1.out.pl
+imagen del layout: newblue1.ppm
+tiempos por etapa (s): parseo=4.2926  initial_place=9.0716  nesterov=621.3518  legalizacion=25.2087  escritura=0.8939
+perfil por iteracion: newblue1.prof.csv

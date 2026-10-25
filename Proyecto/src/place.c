@@ -6,10 +6,11 @@
 #include <time.h>
 #include "place.h"
 #include "wirelength.h"
-#include "density.h"
+#include "backend.h"
 #include "optimizer.h"
 #include "grid.h"
 #include "initial_place.h"
+#include "prof.h"
 
 #define TARGET_OVERFLOW 0.1f
 #define MIN_ITERS 800
@@ -67,20 +68,57 @@ static double elapsed_seconds(struct timespec t0, struct timespec t1)
     return (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) * 1e-9;
 }
 
-static int cmp_float(const void *a, const void *b)
+static void swap_float(float *a, float *b)
 {
-    float fa = *(const float *)a, fb = *(const float *)b;
-    return (fa > fb) - (fa < fb);
+    float t = *a;
+    *a = *b;
+    *b = t;
+}
+
+// el k-esimo menor de a[0..n-1] (k desde 0), reordenando a: el mismo valor que
+// dejaria qsort en a[k], sin ordenar todo. Cada particion descarta el lado
+// donde no esta k, asi el costo esperado es lineal en vez de n log n.
+static float select_kth(float *a, int n, int k)
+{
+    int lo = 0, hi = n - 1;
+    while (lo < hi) {
+        // pivote = mediana de tres, para no caer en el peor caso con datos casi ordenados
+        int mid = lo + (hi - lo) / 2;
+        if (a[mid] < a[lo]) swap_float(&a[mid], &a[lo]);
+        if (a[hi] < a[lo]) swap_float(&a[hi], &a[lo]);
+        if (a[hi] < a[mid]) swap_float(&a[hi], &a[mid]);
+        float pivot = a[mid];
+
+        int i = lo, j = hi;
+        while (i <= j) {
+            while (a[i] < pivot) i++;
+            while (a[j] > pivot) j--;
+            if (i <= j) {
+                swap_float(&a[i], &a[j]);
+                i++;
+                j--;
+            }
+        }
+        // quedo a[lo..j] <= pivote <= a[i..hi]; entre j e i solo hay iguales al pivote
+        if (k <= j)
+            hi = j;
+        else if (k >= i)
+            lo = i;
+        else
+            return a[k];
+    }
+    return a[k];
 }
 
 // la mediana de un arreglo de magnitudes, usando abs[] como escritorio (se
-// reordena, no importa porque el que llama ya tiene su propia copia sin tocar)
+// reordena, no importa porque el que llama ya tiene su propia copia sin tocar).
+// Antes se ordenaba todo con qsort para leer un solo elemento, y el perfilado
+// por etapa mostro que eso pesaba mas que wirelength en el ciclo.
 static float median_abs(float *abs_vals, const float *v, int n2)
 {
     for (int i = 0; i < n2; i++)
         abs_vals[i] = fabsf(v[i]);
-    qsort(abs_vals, n2, sizeof(float), cmp_float);
-    return abs_vals[n2 / 2];
+    return select_kth(abs_vals, n2, n2 / 2);
 }
 
 // calibracion inicial de lambda: cuanto mayor es el gradiente "tipico" de
@@ -104,6 +142,12 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
 
     Grid grid;
     grid_init(&grid, nl);
+    // wirelength y densidad corren en la CPU o en la GPU segun como se compilo
+    Backend *backend = backend_create(nl, &grid);
+    if (!backend) {
+        fprintf(stderr, "no se pudo preparar wirelength/densidad (sin GPU?)\n");
+        exit(1);
+    }
     float avg_bin = 0.5f * (grid.bin_w + grid.bin_h);
     float gamma_min = avg_bin;
     float gamma_max = 20.0f * avg_bin;
@@ -140,8 +184,8 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     // arranque: se calibra lambda y se arma un punto "anterior" artificial
     // (perturbando en direccion del gradiente) para poder estimar el primer
     // paso con la formula tipo secante de mas abajo.
-    compute_wirelength(nl, st.v, gamma, grad_w);
-    compute_density(nl, &grid, st.v, grad_d, &overflow);
+    backend_wirelength(backend, st.v, gamma, grad_w);
+    backend_density(backend, st.v, grad_d, &overflow);
     float lambda = calibrate_lambda(scratch, grad_w, grad_d, n2);
     // una vez que la densidad ya no hace falta (el layout esta parejo) su
     // gradiente se acerca a cero y la proporcion se dispara sin control; por
@@ -154,8 +198,8 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
 
     for (int i = 0; i < n2; i++)
         st.v_prev[i] = st.v[i] + 100.0f * grad[i];
-    compute_wirelength(nl, st.v_prev, gamma, grad_w);
-    compute_density(nl, &grid, st.v_prev, grad_d, &overflow);
+    backend_wirelength(backend, st.v_prev, gamma, grad_w);
+    backend_density(backend, st.v_prev, grad_d, &overflow);
     combine_grad(nl, st.grad_prev, grad_w, grad_d, lambda);
 
     st.step = estimate_step(st.v, st.v_prev, grad, st.grad_prev, n2, max_step, max_step);
@@ -186,8 +230,13 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
 
     clock_gettime(CLOCK_MONOTONIC, &t0);
     for (int iter = 0; iter < MAX_ITERS; iter++) {
-        compute_wirelength(nl, st.v, gamma, grad_w);
-        compute_density(nl, &grid, st.v, grad_d, &overflow);
+        // una fila de muestras por iteracion, una columna por etapa (prof.h)
+        prof_begin_iter();
+        double mark = prof_now();
+        backend_wirelength(backend, st.v, gamma, grad_w);
+        mark = prof_lap(PROF_WIRELENGTH, mark);
+        backend_density(backend, st.v, grad_d, &overflow);
+        mark = prof_lap(PROF_DENSITY, mark);
         float raw_lambda = calibrate_lambda(scratch, grad_w, grad_d, n2);
         if (raw_lambda < lambda_min) raw_lambda = lambda_min;
         if (raw_lambda > lambda_max) raw_lambda = lambda_max;
@@ -197,8 +246,11 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
         // sin suavizar ese lazo puede oscilar en vez de converger.
         lambda = 0.9f * lambda + 0.1f * (raw_lambda * escalate);
         st.lambda = lambda;
+        mark = prof_lap(PROF_LAMBDA, mark);
         combine_grad(nl, grad, grad_w, grad_d, lambda);
+        mark = prof_lap(PROF_UPDATE, mark);
         double hpwl = compute_hpwl(nl, st.v);
+        mark = prof_lap(PROF_HPWL, mark);
 
         if (iter % 100 == 0)
             printf("  iter %4d: HPWL %.4e  overflow %.3f\n", iter, hpwl, overflow);
@@ -225,7 +277,10 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
 
         st.step = estimate_step(st.v, st.v_prev, grad, st.grad_prev, n2, max_step, st.step);
         nesterov_step(&st, grad);
+        prof_lap(PROF_UPDATE, mark);
+        prof_end_iter();
     }
+    prof_end_iter();   // si el ciclo termino con break la ultima fila sigue abierta
     clock_gettime(CLOCK_MONOTONIC, &t1);
     if (out_timings)
         out_timings->t_nesterov = elapsed_seconds(t0, t1);
@@ -243,5 +298,6 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     free(st.v);
     free(st.v_prev);
     free(st.grad_prev);
+    backend_destroy(backend);
     grid_free(&grid);
 }
