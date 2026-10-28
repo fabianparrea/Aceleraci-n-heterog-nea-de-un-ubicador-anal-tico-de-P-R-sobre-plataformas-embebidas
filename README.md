@@ -42,26 +42,6 @@ make
 ./build/placer bench/ispd2005/adaptec1.aux
 ```
 
-## Versión con GPU (Jetson Nano, CUDA)
-
-Se compila y se corre en la Jetson Nano. CUDA 10.2 y gcc 7.5 ya vienen con JetPack 4.6.
-
-``` bash
-cd Proyecto
-make gpu                                       # compila build/placer_gpu
-make test-gpu                                  # compara GPU contra CPU: debe terminar en "test_gpu: ok"
-./build/placer_gpu bench/ispd2005/adaptec1.aux
-```
-
-Para medir el tiempo de cada etapa (los benchmarks corren de a uno):
-
-``` bash
-sudo nvpmodel -m 0 && sudo jetson_clocks       # máximo rendimiento y relojes fijos
-tests/run_profile.sh cpu 4                     # solo CPU  -> results/jetson/cpu_4t/
-tests/run_profile.sh gpu 4                     # con GPU   -> results/jetson/gpu_4t/
-python3 tests/profile_report.py results/jetson/cpu_4t results/jetson/gpu_4t
-```
-
 ## Etapas del prototipo
 
 ### Prototipo completo en CPU: 
@@ -392,6 +372,83 @@ Se confirma que el ciclo de Nesterov domina más del *95 %* del tiempo total en 
 **Observación:** el ciclo de Nesterov representa más del 95 % del tiempo de ejecución en todos los circuitos evaluados, por lo que constituye el principal candidato para la aceleración. Dentro de este ciclo, los cálculos de longitud de cable y densidad son los núcleos seleccionados para la arquitectura propuesta.
 
 
+## Prototipo en Acelerador I (Jetson Nano)
+
+### Ejecución
+
+Todo se corre en la misma Jetson Nano del curso que nos facilitó el profesor, que ya trae JetPack 4.6 con CUDA 10.2 y gcc 7.5, por lo que no hace falta instalar nada.
+
+``` bash
+cd Proyecto
+sudo nvpmodel -m 0 && sudo jetson_clocks
+make && make gpu
+tests/run_profile.sh cpu 4
+tests/run_profile.sh gpu 4
+python3 tests/profile_report.py results/jetson/cpu_4t results/jetson/gpu_4t > results/jetson/reporte.md
+```
+
+Esto deja la Jetson en su modo de máximo rendimiento para asegurar un performance parecido entre corridass, compila la versión solo CPU y la versión con GPU, y corre los cuatro circuitos benchmark de a uno, primero en CPU con sus cuatro núcleos y después con la GPU. Las dos versiones van instrumentadas, así que cada corrida guarda el tiempo de cada etapa en cada iteración dentro de `results/jetson/cpu_4t/` y `results/jetson/gpu_4t/`. Al final, `profile_report.py` junta todo en `results/jetson/reporte.md`, con las tablas por etapa y la mejora de la GPU sobre la CPU. La parte de CPU tarda unos 25 minutos y la de GPU unos 7.
+
+Los resultados que se muestran en esta sección salen de una corrida que ya se hizo en la Jetson para validar los datos, y están guardados en `Proyecto/results/jetson/`: la línea base en `cpu_base_4t/`, la versión con GPU en `gpu_4t/` y el reporte completo en `reporte_etapas.md`. Si se vuelve a correr el comando de arriba, los resultados nuevos de la GPU reemplazan los de `gpu_4t/`.
+
+### Línea base en la CPU de la Jetson
+
+Antes de tocar la GPU se corrió el prototipo en C usando solo los cuatro núcleos de la Jetson. Esos tiempos son la línea base contra la que se compara la versión acelerada. Para ver qué partes pesan más se instrumentó el ciclo de Nesterov con chrono (`clock_gettime`): cada iteración guarda cuánto tardó cada etapa, lo que da entre 800 y 1000 muestras por etapa en cada circuito.
+
+| Circuito | Tiempo total (s) | Longitud de cable | Densidad | Calibración de lambda |
+| :--- | ---: | ---: | ---: | ---: |
+| `adaptec1` | 559.3 | 19.1 % | 32.2 % | 46.1 % |
+| `adaptec2` | 649.6 | 19.6 % | 28.3 % | 49.3 % |
+| `bigblue1` | 678.7 | 22.4 % | 27.4 % | 47.4 % |
+| `newblue1` | 661.9 | 18.8 % | 23.4 % | 55.1 % |
+
+Los porcentajes son del ciclo de Nesterov, que es más del 97 % de cada corrida. Entre las tres etapas suman el 97 % del ciclo. La que más pesaba era la calibración de lambda, que ordenaba con `qsort` todos los gradientes solo para sacar una mediana, y lo hacía en un solo hilo.
+
+### Módulos llevados a la GPU
+
+Con CUDA se llevaron a la GPU los dos cálculos que se repiten en cada iteración. La longitud de cable (`wirelength_gpu.cu`) usa un hilo por red para calcular el promedio ponderado y su gradiente. La densidad (`density_gpu.cu`) reparte el área de las celdas en la grilla, resuelve la ecuación de Poisson y saca el campo y el gradiente de cada celda. Como cuFFT no trae una DCT, `dct_gpu.cu` la arma a partir de una FFT real, lo que además baja su costo de O(n²) a O(n log n) por línea. `backend.c` decide si estos cálculos corren en la CPU o en la GPU según cómo se compiló.
+
+En cuanto a optimización, el netlist se sube a la GPU una sola vez al inicio y en cada iteración solo viajan las posiciones de ida y los gradientes de vuelta. Cada hilo de longitud de cable resuelve x e y en la misma pasada, y las sumas se toman desde los extremos de cada red para no perder precisión en `float`. La calibración de lambda se quedó en la CPU, pero se cambió el ordenamiento completo por una selección (quickselect) que da exactamente la misma mediana sin ordenar todo.
+
+### Resultados con la GPU
+
+| Circuito | Línea base CPU (s) | Con GPU (s) | Mejora |
+| :--- | ---: | ---: | ---: |
+| `adaptec1` | 559.3 | 71.9 | 7.8x |
+| `adaptec2` | 649.6 | 91.6 | 7.1x |
+| `bigblue1` | 678.7 | 90.5 | 7.5x |
+| `newblue1` | 661.9 | 115.2 | 5.7x |
+
+La calidad del resultado se mantiene. Este es el HPWL final, ya legalizado, de cada corrida:
+
+| Circuito | HPWL línea base CPU | HPWL con GPU | Diferencia |
+| :--- | ---: | ---: | ---: |
+| `adaptec1` | 1.5485e8 | 1.5472e8 | -0.09 % |
+| `adaptec2` | 2.4332e8 | 2.4144e8 | -0.77 % |
+| `bigblue1` | 1.3034e8 | 1.3032e8 | -0.02 % |
+| `newblue1` | 1.5579e9 | 1.5387e9 | -1.23 % |
+
+Las diferencias realmente son mínimas por lo que se puede asegurar que en esencia se llega al mismo resultado con la GPU, la diferencia generada es en parte por la variación entre corridas
+
+La misma instrumentación corre en la versión con GPU, y ahí los kernels y las copias entre CPU y GPU se miden con eventos de CUDA. Así queda una iteración de `adaptec1` a modo de ejemplo:
+
+| Etapa | Línea base CPU (ms) | Con GPU (ms)|
+| :--- | ---: | ---: |
+| Longitud de cable | 104.0 | 20.3 |
+| Densidad (incluye la DCT) | 175.8 | 4.9 |
+| Calibración de lambda | 251.6 | 16.7 |
+| HPWL y paso de Nesterov | 13.8 | 15.3 |
+| Iteración completa | 545.2 | 57.3 |
+
+De esos 57.3 ms, 3.7 son copias entre CPU y GPU, ya contadas dentro de longitud de cable y densidad.
+
+### Conclusiones
+
+Llevar la longitud de cable y la densidad a la GPU, junto con el cambio a quickselect, hace la corrida completa entre 5.7 y 7.8 veces más rápida. Solo quickselect ya aporta entre 1.7 y 2.0 veces, y en la densidad parte de la mejora viene de pasar la DCT a FFT. Ahora lo que sigue en la CPU (lambda, el paso de Nesterov y el HPWL) es más de la mitad de cada iteración.
+
+Como trabajo futuro se va a seguir optimizando lo que ya corre en la GPU. Lo primero es el kernel de longitud de cable, que es su parte más lenta (18.2 de los 57.3 ms de una iteración en `adaptec1`) porque cada pin lee posiciones dispersas en memoria, y lo segundo son las copias entre CPU y GPU que se hacen en cada iteración. No se va a pasar todo el algoritmo a la GPU: el ciclo de Nesterov, que orquesta todo el proceso, y el legalizador se quedan en la CPU.
+
+
 ## Dependencias
 
 Se tienen algunas dependencias externas que son manejadas por el archivo `Makefile` y están incluídas en el toolchain de C en linux.
@@ -403,20 +460,6 @@ Se tienen algunas dependencias externas que son manejadas por el archivo `Makefi
 - Bibliotecas estándar del sistema: `stdio.h`, `stdlib.h`, `string.h`, `math.h`, `time.h`
 - Pyhton3 y la biblioteca `pandas` para generar la tabla de resumen de desempeño
 
-
-Si al ejecutar el comando `make` no se logra compilar por falta de herramientas, puedes instalarlas con:
-
-```bash
-sudo apt-get update
-sudo apt-get install -y build-essential gcc make libomp-dev
-```
-
-Luego, desde la carpeta del proyecto:
-
-```bash
-cd Proyecto
-make
-```
 
 ## Características de los sistemas
 
