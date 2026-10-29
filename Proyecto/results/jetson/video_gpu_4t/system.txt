@@ -1,0 +1,20 @@
+fecha: 2026-10-28T11:52:09-06:00
+binario: /home/el5859/grupo6/Aceleraci-n-heterog-nea-de-un-ubicador-anal-tico-de-P-R-sobre-plataformas-embebidas/Proyecto/build/placer_gpu
+sha256: 30366df391287b32a5d7ab1ad1853862a2f70da9951a39c3e29d0aebb48fdccb
+hilos (OMP_NUM_THREADS): 4
+Linux jetson-183 4.9.253-tegra #1 SMP PREEMPT Sat Feb 19 08:59:22 PST 2022 aarch64 aarch64 aarch64 GNU/Linux
+# R32 (release), REVISION: 7.1, GCID: 29818004, BOARD: t210ref, EABI: aarch64, DATE: Sat Feb 19 17:05:08 UTC 2022
+gcc (Ubuntu/Linaro 7.5.0-3ubuntu1~18.04) 7.5.0
+Build cuda_10.2_r440.TC440_70.29663091_0
+nucleos en linea: 0-3
+cpu0: schedutil 1479-1479 MHz
+cpu1: schedutil 1479-1479 MHz
+cpu2: schedutil 1479-1479 MHz
+cpu3: schedutil 1479-1479 MHz
+gpu: nvhost_podgov 921-921 MHz
+NVPM WARN: fan mode is not set!
+NV Power Mode: MAXN
+0
+NVPM ERROR: Error opening /sys/kernel/nvpmodel_emc_cap/emc_iso_cap: 13
+NVPM ERROR: failed to read PARAM EMC: ARG MAX_FREQ: PATH /sys/kernel/nvpmodel_emc_cap/emc_iso_cap
+version: 23c31e7-dirty (27 archivos sin commitear)
