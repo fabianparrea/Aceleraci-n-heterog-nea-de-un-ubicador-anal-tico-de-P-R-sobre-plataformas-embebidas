@@ -393,11 +393,15 @@ Los resultados que se muestran en esta sección salen de una corrida que ya se h
 
 Si se quiere ejecutar únicamente la versión GPU, sin volver a correr la línea base en CPU, se puede utilizar el siguiente comando:
 
+```bash
 tests/run_profile.sh gpu 4
+```
 
 Para evitar sobrescribir los resultados anteriores, se utilizó `OUT_NAME` para guardar la nueva ejecución en una carpeta diferente:
 
+```bash
 OUT_NAME=video_gpu_4t tests/run_profile.sh gpu 4
+```
 
 En este caso, los archivos generados quedan en results/jetson/video_gpu_4t/, mientras que los resultados de gpu_4t/ se mantienen sin cambios.
 
