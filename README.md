@@ -391,6 +391,16 @@ Esto deja la Jetson en su modo de máximo rendimiento para asegurar un performan
 
 Los resultados que se muestran en esta sección salen de una corrida que ya se hizo en la Jetson para validar los datos, y están guardados en `Proyecto/results/jetson/`: la línea base en `cpu_base_4t/`, la versión con GPU en `gpu_4t/` y el reporte completo en `reporte_etapas.md`. Si se vuelve a correr el comando de arriba, los resultados nuevos de la GPU reemplazan los de `gpu_4t/`.
 
+Si se quiere ejecutar únicamente la versión GPU, sin volver a correr la línea base en CPU, se puede utilizar el siguiente comando:
+
+tests/run_profile.sh gpu 4
+
+Para evitar sobrescribir los resultados anteriores, se utilizó `OUT_NAME` para guardar la nueva ejecución en una carpeta diferente:
+
+OUT_NAME=video_gpu_4t tests/run_profile.sh gpu 4
+
+En este caso, los archivos generados quedan en results/jetson/video_gpu_4t/, mientras que los resultados de gpu_4t/ se mantienen sin cambios.
+
 ### Línea base en la CPU de la Jetson
 
 Antes de tocar la GPU se corrió el prototipo en C usando solo los cuatro núcleos de la Jetson. Esos tiempos son la línea base contra la que se compara la versión acelerada. Para ver qué partes pesan más se instrumentó el ciclo de Nesterov con chrono (`clock_gettime`): cada iteración guarda cuánto tardó cada etapa, lo que da entre 800 y 1000 muestras por etapa en cada circuito.
@@ -441,6 +451,35 @@ La misma instrumentación corre en la versión con GPU, y ahí los kernels y las
 | Iteración completa | 545.2 | 57.3 |
 
 De esos 57.3 ms, 3.7 son copias entre CPU y GPU, ya contadas dentro de longitud de cable y densidad.
+
+#### Verificación de la ejecución en Jetson Nano
+
+Se corrieron los cuatro benchmarks mediante run_profile.sh, sin repetir la línea base en CPU.
+
+| Circuito | Muestras registradas | HPWL legalizado |
+| :--- | ---: | ---: |
+| `adaptec1` | 1000 | 1.548198e8 |
+| `adaptec2` | 1000 | 2.399293e8 |
+| `bigblue1` | 1000 | 1.301608e8 |
+| `newblue1` | 802 | 1.554933e9 |
+
+Las muestras corresponden a las iteraciones del ciclo de Nesterov. Los cuatro benchmarks finalizaron correctamente y se generaron los archivos de perfilado, los registros de ejecución y las posiciones finales de las celdas.
+
+Los resultados se guardaron en `results/jetson/video_gpu_4t/`, separados de las mediciones anteriores.
+
+#### Video de demostración
+
+Se grabó una demostración de 57 segundos de la ejecución GPU en la Jetson Nano. En el video se muestran los cuatro benchmarks (`adaptec1`, `adaptec2`, `bigblue1` y `newblue1`) y sus respectivos resultados.
+
+A continuación, se muestra una versión corta, en forma de gif, de la ejecución:
+
+<p align="center">
+  <img src="Proyecto/assets/GPU01.gif"
+       alt="Demostración de los benchmarks GPU en la Jetson Nano"
+       width="850">
+</p>
+
+**Video de demostración:** [Ver video](https://www.youtube.com/watch?v=_g9zemYpb-Q&list=PLZxpsgKPQTyq59WZcApOzAe8b5uaUJxRk&index=1)
 
 ### Conclusiones
 
