@@ -454,7 +454,7 @@ De esos 57.3 ms, 3.7 son copias entre CPU y GPU, ya contadas dentro de longitud 
 
 #### Verificación de la ejecución en Jetson Nano
 
-Se corrieron los cuatro benchmarks mediante run_profile.sh, sin repetir la línea base en CPU.
+Se corrieron los cuatro benchmarks mediante `run_profile.sh`, sin repetir la línea base en CPU.
 
 | Circuito | Muestras registradas | HPWL legalizado |
 | :--- | ---: | ---: |
@@ -465,7 +465,7 @@ Se corrieron los cuatro benchmarks mediante run_profile.sh, sin repetir la líne
 
 Las muestras corresponden a las iteraciones del ciclo de Nesterov. Los cuatro benchmarks finalizaron correctamente y se generaron los archivos de perfilado, los registros de ejecución y las posiciones finales de las celdas.
 
-Los resultados se guardaron en `results/jetson/video_gpu_4t/`, separados de las mediciones anteriores.
+Los resultados de esta ejecución se encuentran en [`results/jetson/video_gpu_4t/`](Proyecto/results/jetson/video_gpu_4t/), separados de las mediciones anteriores.
 
 #### Video de demostración
 
