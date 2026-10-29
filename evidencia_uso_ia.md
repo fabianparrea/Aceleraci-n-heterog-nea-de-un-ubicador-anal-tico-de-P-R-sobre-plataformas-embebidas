@@ -92,3 +92,14 @@ La IA propuso los comandos de git (crear rama, resolver conflictos de un PR,
 fusionar con `develop`) pero **no ejecutó ningún commit ni push sin que el
 estudiante lo pidiera explícitamente en cada caso** — varias veces el estudiante
 corrió los comandos él mismo y le pidió a la IA solo verificar el resultado.
+
+
+## 8. Prototipo en acelerador (Jetson Nano, GPU)
+
+Se mantuvo la misma forma de trabajo. El estudiante decidió qué hacer en cada paso
+(qué llevar a la GPU, cómo medir y en qué orden) y revisó todo antes de aceptarlo.
+La IA se usó para ejecutar esas indicaciones: escribió el código que se le pidió
+(perfilado por iteración, quickselect, kernels de CUDA y la prueba contra la CPU), y preparó borradores de la
+documentación. El estudiante también corrió el prototipo en la Jetson e hizo los
+commits.
+
