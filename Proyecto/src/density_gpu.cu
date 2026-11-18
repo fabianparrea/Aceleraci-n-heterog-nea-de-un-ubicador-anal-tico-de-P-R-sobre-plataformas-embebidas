@@ -1,4 +1,5 @@
 #include <math.h>
+#include <string.h>
 #include "gpu_internal.h"
 
 #ifndef M_PI
@@ -180,7 +181,7 @@ void density_gpu_init(GpuPlacer *g, const Grid *grid)
     CUDA_CHECK(cudaMemcpy(g->inv_w2, table, bytes, cudaMemcpyHostToDevice));
     free(table);
 
-    dct_gpu_init(&g->dct, nx);
+    dct_gpu_init(&g->dct, nx, g->s_d);
 }
 
 void density_gpu_free(GpuPlacer *g)
@@ -193,66 +194,80 @@ void density_gpu_free(GpuPlacer *g)
     cudaFree(g->inv_w2);
 }
 
-double gpu_density(GpuPlacer *g, const float *v, float *grad, float *overflow)
+// encola en s_d todo el calculo de densidad; arranca cuando termina de subir v
+void density_enqueue(GpuPlacer *g, int with_grad)
 {
     int n = g->num_cells;
     int nb = g->geo.nx * g->geo.ny;
     int cell_blocks = (n + GPU_THREADS - 1) / GPU_THREADS;
-    int bin_blocks = (nb + GPU_THREADS - 1) / GPU_THREADS;
-    size_t bytes = 2 * (size_t)n * sizeof(float);
+    int bin_blocks = g->bin_blocks;
+    float *part = g->partial + g->wl_parts;
+    cudaStream_t s = g->s_d;
     cudaEvent_t *ev = g->ev;
+    g->d_grad = with_grad;
 
-    CUDA_CHECK(cudaEventRecord(ev[0]));
-    CUDA_CHECK(cudaMemcpy(g->v, v, bytes, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaEventRecord(ev[1]));
-
-    CUDA_CHECK(cudaMemset(g->density, 0, nb * sizeof(float)));
-    splat_kernel<<<cell_blocks, GPU_THREADS>>>(n, g->v, g->cell_w, g->cell_h, g->geo,
-                                               g->density);
+    CUDA_CHECK(cudaStreamWaitEvent(s, ev[EV_UP1], 0));
+    CUDA_CHECK(cudaEventRecord(ev[EV_D0], s));
+    CUDA_CHECK(cudaMemsetAsync(g->density, 0, nb * sizeof(float), s));
+    splat_kernel<<<cell_blocks, GPU_THREADS, 0, s>>>(n, g->v, g->cell_w, g->cell_h, g->geo,
+                                                     g->density);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaEventRecord(ev[2]));
+    CUDA_CHECK(cudaEventRecord(ev[EV_D_SPLAT], s));
 
-    CUDA_CHECK(cudaMemcpy(g->phi, g->density, nb * sizeof(float), cudaMemcpyDeviceToDevice));
+    CUDA_CHECK(cudaMemcpyAsync(g->phi, g->density, nb * sizeof(float),
+                               cudaMemcpyDeviceToDevice, s));
     dct_gpu_forward(&g->dct, g->phi);
-    scale_kernel<<<bin_blocks, GPU_THREADS>>>(nb, g->inv_w2, g->phi);
+    scale_kernel<<<bin_blocks, GPU_THREADS, 0, s>>>(nb, g->inv_w2, g->phi);
     CUDA_CHECK(cudaGetLastError());
     dct_gpu_inverse(&g->dct, g->phi);
-    CUDA_CHECK(cudaEventRecord(ev[3]));
+    CUDA_CHECK(cudaEventRecord(ev[EV_D_POISSON], s));
 
-    field_kernel<<<bin_blocks, GPU_THREADS>>>(g->geo, g->phi, g->ex, g->ey);
+    field_kernel<<<bin_blocks, GPU_THREADS, 0, s>>>(g->geo, g->phi, g->ex, g->ey);
     CUDA_CHECK(cudaGetLastError());
     float bin_cap = g->geo.bin_w * g->geo.bin_h;   // target de ocupacion = 100%
-    sums_kernel<<<bin_blocks, GPU_THREADS>>>(nb, g->density, g->phi, bin_cap,
-                                             g->partial, g->partial + bin_blocks);
+    sums_kernel<<<bin_blocks, GPU_THREADS, 0, s>>>(nb, g->density, g->phi, bin_cap,
+                                                   part, part + bin_blocks);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaEventRecord(ev[4]));
+    CUDA_CHECK(cudaEventRecord(ev[EV_D_FIELD], s));
 
-    if (grad) {
-        density_grad_kernel<<<cell_blocks, GPU_THREADS>>>(n, g->v, g->cell_w, g->cell_h,
-                                                          g->cell_fixed, g->geo,
-                                                          g->ex, g->ey, g->grad);
+    if (with_grad) {
+        density_grad_kernel<<<cell_blocks, GPU_THREADS, 0, s>>>(n, g->v, g->cell_w, g->cell_h,
+                                                                g->cell_fixed, g->geo,
+                                                                g->ex, g->ey, g->grad_d);
         CUDA_CHECK(cudaGetLastError());
     }
-    CUDA_CHECK(cudaEventRecord(ev[5]));
+    CUDA_CHECK(cudaEventRecord(ev[EV_D_GRAD], s));
+}
 
-    CUDA_CHECK(cudaMemcpy(g->h_partial, g->partial, 2 * bin_blocks * sizeof(float),
-                          cudaMemcpyDeviceToHost));
-    if (grad)
-        CUDA_CHECK(cudaMemcpy(grad, g->grad, bytes, cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaEventRecord(ev[6]));
-    CUDA_CHECK(cudaEventSynchronize(ev[6]));
+// trae el gradiente, la energia y el overflow; solo espera a s_d
+double density_wait(GpuPlacer *g, float *grad, float *overflow)
+{
+    int bin_blocks = g->bin_blocks;
+    size_t bytes = 2 * (size_t)g->num_cells * sizeof(float);
+    float *part = g->partial + g->wl_parts, *h_part = g->h_partial + g->wl_parts;
+    cudaStream_t s = g->s_d;
+    cudaEvent_t *ev = g->ev;
 
-    prof_add(PROF_H2D, gpu_elapsed(ev[0], ev[1]));
-    prof_add(PROF_SPLAT, gpu_elapsed(ev[1], ev[2]));
-    prof_add(PROF_POISSON, gpu_elapsed(ev[2], ev[3]));
-    prof_add(PROF_FIELD, gpu_elapsed(ev[3], ev[4]));
-    prof_add(PROF_DENSITY_GRAD, gpu_elapsed(ev[4], ev[5]));
-    prof_add(PROF_D2H, gpu_elapsed(ev[5], ev[6]));
+    CUDA_CHECK(cudaMemcpyAsync(h_part, part, 2 * bin_blocks * sizeof(float),
+                               cudaMemcpyDeviceToHost, s));
+    if (grad && g->d_grad)
+        CUDA_CHECK(cudaMemcpyAsync(grad, g->grad_d, bytes, cudaMemcpyDeviceToHost, s));
+    CUDA_CHECK(cudaEventRecord(ev[EV_D_D2H], s));
+    CUDA_CHECK(cudaEventSynchronize(ev[EV_D_D2H]));
 
+    gpu_count_upload(g);
+    prof_add(PROF_SPLAT, gpu_elapsed(ev[EV_D0], ev[EV_D_SPLAT]));
+    prof_add(PROF_POISSON, gpu_elapsed(ev[EV_D_SPLAT], ev[EV_D_POISSON]));
+    prof_add(PROF_FIELD, gpu_elapsed(ev[EV_D_POISSON], ev[EV_D_FIELD]));
+    prof_add(PROF_DENSITY_GRAD, gpu_elapsed(ev[EV_D_FIELD], ev[EV_D_GRAD]));
+    prof_add(PROF_D2H, gpu_elapsed(ev[EV_D_GRAD], ev[EV_D_D2H]));
+
+    if (grad && !g->d_grad)
+        memset(grad, 0, bytes);
     double energy = 0.0, over = 0.0;
     for (int b = 0; b < bin_blocks; b++) {
-        energy += g->h_partial[b];
-        over += g->h_partial[bin_blocks + b];
+        energy += h_part[b];
+        over += h_part[bin_blocks + b];
     }
     if (overflow)
         *overflow = g->movable_area > 0 ? (float)(over / g->movable_area) : 0.0f;

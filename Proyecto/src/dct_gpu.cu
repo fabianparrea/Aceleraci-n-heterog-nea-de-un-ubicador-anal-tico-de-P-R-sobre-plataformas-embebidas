@@ -84,11 +84,14 @@ __global__ void dct_unreorder_kernel(const float *work, float *data, int n, int 
         data[line_at(line, makhoul_src(i, n), n, cols)] = work[line * n + i] / n;
 }
 
-void dct_gpu_init(DctGpu *d, int n)
+void dct_gpu_init(DctGpu *d, int n, cudaStream_t stream)
 {
     d->n = n;
+    d->stream = stream;
     CUFFT_CHECK(cufftPlan1d(&d->r2c, n, CUFFT_R2C, n));
     CUFFT_CHECK(cufftPlan1d(&d->c2r, n, CUFFT_C2R, n));
+    CUFFT_CHECK(cufftSetStream(d->r2c, stream));
+    CUFFT_CHECK(cufftSetStream(d->c2r, stream));
     CUDA_CHECK(cudaMalloc(&d->work, (size_t)n * n * sizeof(float)));
     CUDA_CHECK(cudaMalloc(&d->spec, (size_t)n * (n / 2 + 1) * sizeof(cufftComplex)));
 
@@ -119,10 +122,10 @@ void dct_gpu_forward(DctGpu *d, float *data)
     dim3 blocks((n + GPU_THREADS - 1) / GPU_THREADS, n);
     // primero filas y despues columnas, en el mismo orden que dct.c
     for (int cols = 0; cols < 2; cols++) {
-        dct_reorder_kernel<<<blocks, GPU_THREADS>>>(data, d->work, n, cols);
+        dct_reorder_kernel<<<blocks, GPU_THREADS, 0, d->stream>>>(data, d->work, n, cols);
         CUDA_CHECK(cudaGetLastError());
         CUFFT_CHECK(cufftExecR2C(d->r2c, d->work, d->spec));
-        dct_post_kernel<<<blocks, GPU_THREADS>>>(d->spec, d->twiddle, data, n, cols);
+        dct_post_kernel<<<blocks, GPU_THREADS, 0, d->stream>>>(d->spec, d->twiddle, data, n, cols);
         CUDA_CHECK(cudaGetLastError());
     }
 }
@@ -132,10 +135,10 @@ void dct_gpu_inverse(DctGpu *d, float *data)
     int n = d->n;
     dim3 blocks((n + GPU_THREADS - 1) / GPU_THREADS, n);
     for (int cols = 0; cols < 2; cols++) {
-        dct_pre_kernel<<<blocks, GPU_THREADS>>>(data, d->twiddle, d->spec, n, cols);
+        dct_pre_kernel<<<blocks, GPU_THREADS, 0, d->stream>>>(data, d->twiddle, d->spec, n, cols);
         CUDA_CHECK(cudaGetLastError());
         CUFFT_CHECK(cufftExecC2R(d->c2r, d->spec, d->work));
-        dct_unreorder_kernel<<<blocks, GPU_THREADS>>>(d->work, data, n, cols);
+        dct_unreorder_kernel<<<blocks, GPU_THREADS, 0, d->stream>>>(d->work, data, n, cols);
         CUDA_CHECK(cudaGetLastError());
     }
 }
@@ -146,7 +149,7 @@ int gpu_dct2d(float *data, int n, int inverse)
     if (cudaGetDeviceCount(&count) != cudaSuccess || count == 0)
         return -1;
     DctGpu d;
-    dct_gpu_init(&d, n);
+    dct_gpu_init(&d, n, 0);
     size_t bytes = (size_t)n * n * sizeof(float);
     float *dev = NULL;
     CUDA_CHECK(cudaMalloc(&dev, bytes));

@@ -8,12 +8,10 @@
 extern "C" {
 #endif
 
-// Version CUDA de los dos calculos pesados del ciclo: wirelength (un hilo por
-// red) y densidad (reparto de area, Poisson con DCT via cuFFT, campo y
-// gradiente). Mismas cuentas y misma interfaz que compute_wirelength y
-// compute_density: v entra desde el host y el gradiente vuelve al host. En
-// este prototipo cada llamada copia sus datos de ida y vuelta; optimizar esas
-// transferencias queda para la siguiente etapa.
+// Version CUDA de los dos calculos pesados del ciclo: wirelength y densidad
+// (reparto de area, Poisson con DCT via cuFFT, campo y gradiente). Mismas
+// cuentas que compute_wirelength y compute_density: v entra desde el host y
+// los gradientes vuelven al host.
 typedef struct GpuPlacer GpuPlacer;
 
 // Sube lo que no cambia entre iteraciones (redes, pines, tamano de las celdas,
@@ -21,6 +19,15 @@ typedef struct GpuPlacer GpuPlacer;
 GpuPlacer *gpu_create(const Netlist *nl, const Grid *grid);
 void gpu_destroy(GpuPlacer *g);
 
+// Una evaluacion por iteracion, en dos mitades para que la CPU no se quede
+// esperando: gpu_eval_start sube v una sola vez y deja encolados wirelength y
+// densidad, cada uno en su stream, y vuelve enseguida. Cada wait espera solo
+// su parte y trae su gradiente. v no se puede modificar hasta los dos wait.
+void gpu_eval_start(GpuPlacer *g, const float *v, float gamma);
+double gpu_wait_wirelength(GpuPlacer *g, float *grad);
+double gpu_wait_density(GpuPlacer *g, float *grad, float *overflow);
+
+// cada calculo por separado y esperando el resultado (para las pruebas)
 double gpu_wirelength(GpuPlacer *g, const float *v, float gamma, float *grad);
 double gpu_density(GpuPlacer *g, const float *v, float *grad, float *overflow);
 

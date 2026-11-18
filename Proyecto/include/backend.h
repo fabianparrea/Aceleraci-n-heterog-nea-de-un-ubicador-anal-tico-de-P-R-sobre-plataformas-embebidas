@@ -13,8 +13,14 @@ typedef struct Backend Backend;
 Backend *backend_create(const Netlist *nl, Grid *grid);
 void backend_destroy(Backend *b);
 
-// mismo contrato que compute_wirelength y compute_density
-double backend_wirelength(Backend *b, const float *v, float gamma, float *grad);
-double backend_density(Backend *b, const float *v, float *grad, float *overflow);
+// Wirelength y densidad de un mismo punto v, en dos mitades: eval_start
+// arranca el calculo y cada wait devuelve su resultado, con el mismo contrato
+// que compute_wirelength y compute_density. En la version CUDA la GPU trabaja
+// entre start y los wait, y la CPU puede hacer otra cosa en ese rato; en la
+// version CPU los calculos se hacen dentro de cada wait. v tiene que seguir
+// igual hasta el ultimo wait.
+void backend_eval_start(Backend *b, const float *v, float gamma);
+double backend_wait_wirelength(Backend *b, float *grad);
+double backend_wait_density(Backend *b, float *grad, float *overflow);
 
 #endif
