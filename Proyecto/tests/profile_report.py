@@ -18,14 +18,14 @@ import sys
 # en el orden en que se muestran; las sub-etapas van con sangria
 STAGES = [
     ("wirelength", "wirelength", 0),
-    ("wl_kernel", "kernel WA (GPU)", 1),
+    ("wl_kernel", "kernels WA (GPU)", 1),
     ("density", "densidad", 0),
     ("splat", "reparto de area", 1),
     ("poisson", "Poisson (DCT ida + vuelta)", 1),
     ("field", "campo + sumas", 1),
     ("density_grad", "gradiente", 1),
-    ("h2d", "copias host->GPU (dentro de wirelength y densidad)", 1),
-    ("d2h", "copias GPU->host (dentro de wirelength y densidad)", 1),
+    ("h2d", "copias host->GPU (GPU)", 1),
+    ("d2h", "copias GPU->host (GPU)", 1),
     ("lambda", "calibracion de lambda", 0),
     ("hpwl", "HPWL", 0),
     ("update", "combinar + paso + Nesterov", 0),
@@ -199,7 +199,10 @@ def main():
     print("# Perfilado por etapa\n")
     print("Tiempos de pared por iteracion del ciclo de Nesterov (una fila del CSV por iteracion). "
           "En la version GPU las partes de cada etapa se miden con eventos de CUDA y las etapas "
-          "completas con el reloj del host, que incluye el costo de lanzar y esperar.\n")
+          "completas con el reloj del host, que incluye el costo de lanzar y esperar. Desde que "
+          "la GPU trabaja en paralelo con la CPU (HPWL y la mediana de wirelength se calculan "
+          "mientras la GPU sigue), las filas wirelength y densidad son solo lo que la CPU espera "
+          "cada resultado, y las partes medidas en la GPU ya no suman al total de la iteracion.\n")
 
     for cfg, benches in configs:
         print(f"## {cfg}\n")

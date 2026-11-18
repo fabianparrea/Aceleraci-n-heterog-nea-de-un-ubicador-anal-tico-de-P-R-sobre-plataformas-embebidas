@@ -11,6 +11,8 @@
 struct Backend {
     const Netlist *nl;
     Grid *grid;
+    const float *v;      // punto de la evaluacion en curso
+    float gamma;
 #ifdef USE_CUDA
     GpuPlacer *gpu;
 #endif
@@ -43,20 +45,29 @@ void backend_destroy(Backend *b)
     free(b);
 }
 
-double backend_wirelength(Backend *b, const float *v, float gamma, float *grad)
+void backend_eval_start(Backend *b, const float *v, float gamma)
 {
+    b->v = v;
+    b->gamma = gamma;
 #ifdef USE_CUDA
-    return gpu_wirelength(b->gpu, v, gamma, grad);
-#else
-    return compute_wirelength(b->nl, v, gamma, grad);
+    gpu_eval_start(b->gpu, v, gamma);
 #endif
 }
 
-double backend_density(Backend *b, const float *v, float *grad, float *overflow)
+double backend_wait_wirelength(Backend *b, float *grad)
 {
 #ifdef USE_CUDA
-    return gpu_density(b->gpu, v, grad, overflow);
+    return gpu_wait_wirelength(b->gpu, grad);
 #else
-    return compute_density(b->nl, b->grid, v, grad, overflow);
+    return compute_wirelength(b->nl, b->v, b->gamma, grad);
+#endif
+}
+
+double backend_wait_density(Backend *b, float *grad, float *overflow)
+{
+#ifdef USE_CUDA
+    return gpu_wait_density(b->gpu, grad, overflow);
+#else
+    return compute_density(b->nl, b->grid, b->v, grad, overflow);
 #endif
 }

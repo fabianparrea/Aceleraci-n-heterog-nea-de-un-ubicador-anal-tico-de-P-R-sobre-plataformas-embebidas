@@ -11,12 +11,13 @@
 #include "grid.h"
 #include "initial_place.h"
 #include "prof.h"
+#include "median.h"
 
 #define TARGET_OVERFLOW 0.1f
 #define MIN_ITERS 800
 #define MAX_ITERS 1000
 #define MAX_STEP_GROWTH 1.3f
-#define OVERFLOW_PENALTY 5.0
+#define OVERFLOW_PENALTY 20.0
 
 // combina wirelength + lambda*densidad, y deja en cero las celdas fijas: a
 // wirelength no le importa si una celda es un pin fijo, le calcula gradiente
@@ -25,6 +26,7 @@ static void combine_grad(const Netlist *nl, float *grad, const float *grad_w,
                          const float *grad_d, float lambda)
 {
     int n = nl->num_cells;
+    #pragma omp parallel for if(n > 10000)
     for (int i = 0; i < n; i++) {
         float gx = grad_w[i] + lambda * grad_d[i];
         float gy = grad_w[n + i] + lambda * grad_d[n + i];
@@ -37,6 +39,7 @@ static void combine_grad(const Netlist *nl, float *grad, const float *grad_w,
 static float norm_diff(const float *a, const float *b, int n)
 {
     double sum = 0.0;
+    #pragma omp parallel for reduction(+:sum) if(n > 10000)
     for (int i = 0; i < n; i++) {
         double d = (double)a[i] - b[i];
         sum += d * d;
@@ -68,69 +71,69 @@ static double elapsed_seconds(struct timespec t0, struct timespec t1)
     return (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) * 1e-9;
 }
 
-static void swap_float(float *a, float *b)
-{
-    float t = *a;
-    *a = *b;
-    *b = t;
-}
-
-// el k-esimo menor de a[0..n-1] (k desde 0), reordenando a: el mismo valor que
-// dejaria qsort en a[k], sin ordenar todo. Cada particion descarta el lado
-// donde no esta k, asi el costo esperado es lineal en vez de n log n.
-static float select_kth(float *a, int n, int k)
-{
-    int lo = 0, hi = n - 1;
-    while (lo < hi) {
-        // pivote = mediana de tres, para no caer en el peor caso con datos casi ordenados
-        int mid = lo + (hi - lo) / 2;
-        if (a[mid] < a[lo]) swap_float(&a[mid], &a[lo]);
-        if (a[hi] < a[lo]) swap_float(&a[hi], &a[lo]);
-        if (a[hi] < a[mid]) swap_float(&a[hi], &a[mid]);
-        float pivot = a[mid];
-
-        int i = lo, j = hi;
-        while (i <= j) {
-            while (a[i] < pivot) i++;
-            while (a[j] > pivot) j--;
-            if (i <= j) {
-                swap_float(&a[i], &a[j]);
-                i++;
-                j--;
-            }
-        }
-        // quedo a[lo..j] <= pivote <= a[i..hi]; entre j e i solo hay iguales al pivote
-        if (k <= j)
-            hi = j;
-        else if (k >= i)
-            lo = i;
-        else
-            return a[k];
-    }
-    return a[k];
-}
-
-// la mediana de un arreglo de magnitudes, usando abs[] como escritorio (se
-// reordena, no importa porque el que llama ya tiene su propia copia sin tocar).
-// Antes se ordenaba todo con qsort para leer un solo elemento, y el perfilado
-// por etapa mostro que eso pesaba mas que wirelength en el ciclo.
-static float median_abs(float *abs_vals, const float *v, int n2)
-{
-    for (int i = 0; i < n2; i++)
-        abs_vals[i] = fabsf(v[i]);
-    return select_kth(abs_vals, n2, n2 / 2);
-}
-
 // calibracion inicial de lambda: cuanto mayor es el gradiente "tipico" de
 // wirelength comparado con el de densidad, en el punto de arranque. Se usa
 // la mediana y no la suma porque unas pocas celdas (las que quedan justo en
 // el borde de un macro grande, por ejemplo) pueden tener un gradiente de
 // densidad enorme y arruinar un promedio.
-static float calibrate_lambda(float *scratch, const float *grad_w, const float *grad_d, int n2)
+static float lambda_ratio(float med_w, float med_d)
 {
-    float med_w = median_abs(scratch, grad_w, n2);
-    float med_d = median_abs(scratch, grad_d, n2);
     return med_d > 1e-12f ? med_w / med_d : 1.0f;
+}
+
+static float calibrate_lambda(const float *grad_w, const float *grad_d, int n2)
+{
+    return lambda_ratio(median_abs(grad_w, n2), median_abs(grad_d, n2));
+}
+
+// rectangulo donde puede quedar el centro de una celda: el area de las filas
+// (donde despues la deja la legalizacion), o la grilla si no hay .scl
+typedef struct {
+    float x0, y0, x1, y1;
+} Region;
+
+static Region core_region(const Netlist *nl, const Grid *grid)
+{
+    Region r = {grid->x0, grid->y0, grid->x0 + grid->nx * grid->bin_w,
+                grid->y0 + grid->ny * grid->bin_h};
+    if (nl->num_rows > 0) {
+        r.x0 = r.y0 = FLT_MAX;
+        r.x1 = r.y1 = -FLT_MAX;
+        for (int k = 0; k < nl->num_rows; k++) {
+            const Row *row = &nl->rows[k];
+            r.x0 = fminf(r.x0, row->x0);
+            r.y0 = fminf(r.y0, row->y0);
+            r.x1 = fmaxf(r.x1, row->x0 + row->num_sites * row->site_w);
+            r.y1 = fmaxf(r.y1, row->y0 + row->height);
+        }
+    }
+    return r;
+}
+
+// Vuelve a meter en la region las celdas que un paso saco afuera. Afuera de
+// la grilla la densidad ya no las ve (no tocan ningun bin) y solo las traen
+// de vuelta las redes, de a poco; mientras tanto el HPWL se dispara.
+static void clamp_to_region(const Netlist *nl, Region r, float *pos)
+{
+    int n = nl->num_cells;
+    #pragma omp parallel for if(n > 10000)
+    for (int i = 0; i < n; i++) {
+        const Cell *c = &nl->cells[i];
+        if (c->fixed)
+            continue;
+        float hw = c->width / 2, hh = c->height / 2;
+        pos[i] = fminf(fmaxf(pos[i], r.x0 + hw), r.x1 - hw);
+        pos[n + i] = fminf(fmaxf(pos[n + i], r.y0 + hh), r.y1 - hh);
+    }
+}
+
+// wirelength y densidad del punto v, esperando los dos resultados
+static void eval_both(Backend *b, const float *v, float gamma, float *grad_w,
+                      float *grad_d, float *overflow)
+{
+    backend_eval_start(b, v, gamma);
+    backend_wait_wirelength(b, grad_w);
+    backend_wait_density(b, grad_d, overflow);
 }
 
 void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
@@ -148,6 +151,7 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
         fprintf(stderr, "no se pudo preparar wirelength/densidad (sin GPU?)\n");
         exit(1);
     }
+    Region core = core_region(nl, &grid);
     float avg_bin = 0.5f * (grid.bin_w + grid.bin_h);
     float gamma_min = avg_bin;
     float gamma_max = 20.0f * avg_bin;
@@ -156,7 +160,6 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     float *grad = malloc(n2 * sizeof(float));
     float *grad_w = malloc(n2 * sizeof(float));
     float *grad_d = malloc(n2 * sizeof(float));
-    float *scratch = malloc(n2 * sizeof(float));
 
     NesterovState st;
     st.n2 = n2;
@@ -184,9 +187,8 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     // arranque: se calibra lambda y se arma un punto "anterior" artificial
     // (perturbando en direccion del gradiente) para poder estimar el primer
     // paso con la formula tipo secante de mas abajo.
-    backend_wirelength(backend, st.v, gamma, grad_w);
-    backend_density(backend, st.v, grad_d, &overflow);
-    float lambda = calibrate_lambda(scratch, grad_w, grad_d, n2);
+    eval_both(backend, st.v, gamma, grad_w, grad_d, &overflow);
+    float lambda = calibrate_lambda(grad_w, grad_d, n2);
     // una vez que la densidad ya no hace falta (el layout esta parejo) su
     // gradiente se acerca a cero y la proporcion se dispara sin control; por
     // eso lambda se limita a dos ordenes de magnitud alrededor de esta primera
@@ -198,8 +200,7 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
 
     for (int i = 0; i < n2; i++)
         st.v_prev[i] = st.v[i] + 100.0f * grad[i];
-    backend_wirelength(backend, st.v_prev, gamma, grad_w);
-    backend_density(backend, st.v_prev, grad_d, &overflow);
+    eval_both(backend, st.v_prev, gamma, grad_w, grad_d, &overflow);
     combine_grad(nl, st.grad_prev, grad_w, grad_d, lambda);
 
     st.step = estimate_step(st.v, st.v_prev, grad, st.grad_prev, n2, max_step, max_step);
@@ -210,7 +211,11 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     // "penalizado", igual que el sHPWL con el que RePlAce mide sus resultados:
     // en vez de descalificar de una un overflow por encima del objetivo, lo
     // encarece proporcionalmente, asi no se pierde un buen punto que quedo
-    // justo antes de cruzar el umbral.
+    // justo antes de cruzar el umbral. El factor era 5, pero en newblue1 eso
+    // elegia un punto del principio con HPWL bajo y overflow de 0.5, y la
+    // legalizacion de un punto tan amontonado multiplicaba el HPWL por 30.
+    // Con 20 se prefiere uno mas avanzado y mas parejo, que legaliza mucho
+    // mejor; en los otros tres circuitos casi no cambia el punto elegido.
     float *best_u = malloc(n2 * sizeof(float));
     double best_score = DBL_MAX;
     float best_overflow = overflow;
@@ -233,11 +238,22 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
         // una fila de muestras por iteracion, una columna por etapa (prof.h)
         prof_begin_iter();
         double mark = prof_now();
-        backend_wirelength(backend, st.v, gamma, grad_w);
+        // En la version GPU, eval_start deja wirelength y densidad corriendo
+        // en la GPU y la CPU aprovecha ese rato para el HPWL del mismo punto y
+        // despues para la mediana de wirelength, mientras la densidad sigue.
+        // Por eso, con GPU, las etapas wirelength y densidad de abajo miden
+        // solo lo que la CPU se queda esperando cada resultado.
+        backend_eval_start(backend, st.v, gamma);
         mark = prof_lap(PROF_WIRELENGTH, mark);
-        backend_density(backend, st.v, grad_d, &overflow);
+        double hpwl = compute_hpwl(nl, st.v);
+        mark = prof_lap(PROF_HPWL, mark);
+        backend_wait_wirelength(backend, grad_w);
+        mark = prof_lap(PROF_WIRELENGTH, mark);
+        float med_w = median_abs(grad_w, n2);
+        mark = prof_lap(PROF_LAMBDA, mark);
+        backend_wait_density(backend, grad_d, &overflow);
         mark = prof_lap(PROF_DENSITY, mark);
-        float raw_lambda = calibrate_lambda(scratch, grad_w, grad_d, n2);
+        float raw_lambda = lambda_ratio(med_w, median_abs(grad_d, n2));
         if (raw_lambda < lambda_min) raw_lambda = lambda_min;
         if (raw_lambda > lambda_max) raw_lambda = lambda_max;
         // promedio movil en vez de tomar la calibracion cruda: wirelength y
@@ -249,8 +265,6 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
         mark = prof_lap(PROF_LAMBDA, mark);
         combine_grad(nl, grad, grad_w, grad_d, lambda);
         mark = prof_lap(PROF_UPDATE, mark);
-        double hpwl = compute_hpwl(nl, st.v);
-        mark = prof_lap(PROF_HPWL, mark);
 
         if (iter % 100 == 0)
             printf("  iter %4d: HPWL %.4e  overflow %.3f\n", iter, hpwl, overflow);
@@ -277,6 +291,8 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
 
         st.step = estimate_step(st.v, st.v_prev, grad, st.grad_prev, n2, max_step, st.step);
         nesterov_step(&st, grad);
+        clamp_to_region(nl, core, st.u);
+        clamp_to_region(nl, core, st.v);
         prof_lap(PROF_UPDATE, mark);
         prof_end_iter();
     }
@@ -293,7 +309,6 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     free(grad);
     free(grad_w);
     free(grad_d);
-    free(scratch);
     free(st.u);
     free(st.v);
     free(st.v_prev);

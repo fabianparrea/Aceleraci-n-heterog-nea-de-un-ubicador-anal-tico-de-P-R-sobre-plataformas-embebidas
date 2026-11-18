@@ -62,7 +62,8 @@ static void test_dct(void)
 // netlist sintetico del tamano de adaptec1 (sale la misma grilla de 256x256):
 // celdas de varios tamanos, una de cada cien fija y grande como un macro, la
 // mayoria de las redes de 2 a 4 pines como en los benchmarks (algunas de hasta
-// 30, otras de 1 que se saltan, y una de 3000), y la mitad de las celdas
+// 30, unas pocas de 40 a 160 para probar los dos kernels de wirelength, otras
+// de 1 que se saltan, y una de 3000), y la mitad de las celdas
 // amontonadas en el centro para que haya overflow
 static void make_netlist(Netlist *nl, int num_cells, int num_nets)
 {
@@ -96,6 +97,8 @@ static void make_netlist(Netlist *nl, int num_cells, int num_nets)
             deg = 3000;
         else if (e % 50 == 1)
             deg = 1;
+        else if (e % 997 == 2)
+            deg = 40 + rand() % 121;
         else if (rand() % 5)
             deg = 2 + rand() % 3;
         else
@@ -191,6 +194,42 @@ static void test_density(const Netlist *nl, Grid *grid, GpuPlacer *g, const floa
     free(gg);
 }
 
+// la ruta del ciclo: una sola subida de v y los dos calculos en streams
+// distintos. Dos puntos seguidos, para ver que el segundo no se queda con
+// datos del primero.
+static void test_eval(const Netlist *nl, Grid *grid, GpuPlacer *g, const float *v)
+{
+    int n = nl->num_cells, n2 = 2 * n;
+    float *wc = malloc(n2 * sizeof(float)), *wg = malloc(n2 * sizeof(float));
+    float *dc = malloc(n2 * sizeof(float)), *dg = malloc(n2 * sizeof(float));
+    float *moved = malloc(n2 * sizeof(float));
+    for (int i = 0; i < n2; i++)
+        moved[i] = v[i] + (i % 7) - 3.0f;
+
+    const float *points[2] = {v, moved};
+    float gamma = 4.0f * grid->bin_w;
+    for (int t = 0; t < 2; t++) {
+        float oc, og;
+        double tw_c = compute_wirelength(nl, points[t], gamma, wc);
+        compute_density(nl, grid, points[t], dc, &oc);
+        gpu_eval_start(g, points[t], gamma);
+        double tw_g = gpu_wait_wirelength(g, wg);
+        gpu_wait_density(g, dg, &og);
+        double e_w = rel_err(wg, wc, n2), e_d = rel_err(dg, dc, n2);
+        printf("  evaluacion %d con streams   error wirelength %.1e  densidad %.1e\n",
+               t + 1, e_w, e_d);
+        CHECK(fabs(tw_g - tw_c) / tw_c < 1e-5);
+        CHECK(e_w < 1e-4);
+        CHECK(e_d < 1e-3);
+        CHECK(fabs(og - oc) < 1e-4);
+    }
+    free(wc);
+    free(wg);
+    free(dc);
+    free(dg);
+    free(moved);
+}
+
 int main(void)
 {
     test_dct();
@@ -209,6 +248,7 @@ int main(void)
         netlist_get_positions(&nl, v);
         test_wirelength(&nl, &grid, g, v);
         test_density(&nl, &grid, g, v);
+        test_eval(&nl, &grid, g, v);
         free(v);
         gpu_destroy(g);
     }
