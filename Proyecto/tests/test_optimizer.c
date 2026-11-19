@@ -30,9 +30,25 @@ static void test_nesterov_a_sequence(void)
     CHECK_NEAR(st.a, (1.0 + sqrt(1.0 + 4.0 * a1 * a1)) / 2.0, 1e-5);
 }
 
+// con limites, un paso que manda la coordenada afuera la deja en el borde
+static void test_nesterov_bounds(void)
+{
+    float u[2] = {0.5f, 0.5f}, v[2] = {0.5f, 0.5f}, v_prev[2], grad_prev[2];
+    float lo[2] = {0.0f, 0.0f}, hi[2] = {1.0f, 1.0f};
+    NesterovState st = {2, u, v, v_prev, grad_prev, 1.0f, 1.0f, 0.0f, lo, hi};
+    float grad[2] = {-10.0f, 10.0f};
+
+    nesterov_step(&st, grad);
+    CHECK_NEAR(st.u[0], 1.0, 1e-6);
+    CHECK_NEAR(st.v[0], 1.0, 1e-6);
+    CHECK_NEAR(st.u[1], 0.0, 1e-6);
+    CHECK_NEAR(st.v[1], 0.0, 1e-6);
+}
+
 int main(void)
 {
     test_nesterov_converges();
     test_nesterov_a_sequence();
+    test_nesterov_bounds();
     return finish("test_optimizer");
 }
