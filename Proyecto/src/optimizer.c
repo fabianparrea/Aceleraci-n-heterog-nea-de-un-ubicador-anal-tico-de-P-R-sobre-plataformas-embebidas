@@ -14,6 +14,10 @@ void nesterov_step(NesterovState *st, const float *grad)
     for (int i = 0; i < st->n2; i++) {
         float u_new = st->v[i] - st->step * grad[i];
         float v_new = u_new + coeff * (u_new - st->u[i]);
+        if (st->lo) {
+            u_new = fminf(fmaxf(u_new, st->lo[i]), st->hi[i]);
+            v_new = fminf(fmaxf(v_new, st->lo[i]), st->hi[i]);
+        }
 
         st->v_prev[i] = st->v[i];
         st->grad_prev[i] = grad[i];

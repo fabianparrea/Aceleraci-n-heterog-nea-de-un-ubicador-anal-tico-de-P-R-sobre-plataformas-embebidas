@@ -110,20 +110,26 @@ static Region core_region(const Netlist *nl, const Grid *grid)
     return r;
 }
 
-// Vuelve a meter en la region las celdas que un paso saco afuera. Afuera de
-// la grilla la densidad ya no las ve (no tocan ningun bin) y solo las traen
-// de vuelta las redes, de a poco; mientras tanto el HPWL se dispara.
-static void clamp_to_region(const Netlist *nl, Region r, float *pos)
+// Limites de cada coordenada para que el centro de una celda no salga de la
+// region. Afuera de la grilla la densidad ya no ve a la celda (no toca ningun
+// bin) y solo la traen de vuelta las redes, de a poco; mientras tanto el HPWL
+// se dispara. Las celdas fijas no tienen limite. Se arman una sola vez y
+// nesterov_step recorta en el mismo bucle donde actualiza u y v: recorrer
+// las celdas aparte en cada iteracion costaba unos 3 ms en la Jetson.
+static void coord_bounds(const Netlist *nl, Region r, float *lo, float *hi)
 {
     int n = nl->num_cells;
-    #pragma omp parallel for if(n > 10000)
     for (int i = 0; i < n; i++) {
         const Cell *c = &nl->cells[i];
-        if (c->fixed)
-            continue;
-        float hw = c->width / 2, hh = c->height / 2;
-        pos[i] = fminf(fmaxf(pos[i], r.x0 + hw), r.x1 - hw);
-        pos[n + i] = fminf(fmaxf(pos[n + i], r.y0 + hh), r.y1 - hh);
+        if (c->fixed) {
+            lo[i] = lo[n + i] = -FLT_MAX;
+            hi[i] = hi[n + i] = FLT_MAX;
+        } else {
+            lo[i] = r.x0 + c->width / 2;
+            hi[i] = r.x1 - c->width / 2;
+            lo[n + i] = r.y0 + c->height / 2;
+            hi[n + i] = r.y1 - c->height / 2;
+        }
     }
 }
 
@@ -136,7 +142,8 @@ static void eval_both(Backend *b, const float *v, float gamma, float *grad_w,
     backend_wait_density(b, grad_d, overflow);
 }
 
-void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
+void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings,
+                   VizFrames *frames)
 {
     struct timespec t0, t1;
 
@@ -151,7 +158,6 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
         fprintf(stderr, "no se pudo preparar wirelength/densidad (sin GPU?)\n");
         exit(1);
     }
-    Region core = core_region(nl, &grid);
     float avg_bin = 0.5f * (grid.bin_w + grid.bin_h);
     float gamma_min = avg_bin;
     float gamma_max = 20.0f * avg_bin;
@@ -169,6 +175,11 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     st.grad_prev = malloc(n2 * sizeof(float));
     st.a = 1.0f;
     st.lambda = 0.0f;
+    float *bound_lo = malloc(n2 * sizeof(float));
+    float *bound_hi = malloc(n2 * sizeof(float));
+    coord_bounds(nl, core_region(nl, &grid), bound_lo, bound_hi);
+    st.lo = bound_lo;
+    st.hi = bound_hi;
 
     // arranque real: un colocado por minimos cuadrados (cada red tira de sus
     // celdas como un resorte) reparte las celdas segun conectividad antes de
@@ -268,6 +279,12 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
 
         if (iter % 100 == 0)
             printf("  iter %4d: HPWL %.4e  overflow %.3f\n", iter, hpwl, overflow);
+        // el cuadro es del punto v, el mismo del HPWL y el overflow de arriba;
+        // lo que tarda en escribirse no se suma a ninguna etapa del perfil
+        if (viz_frames_due(frames, iter)) {
+            viz_frames_add(frames, st.v, "global", iter, hpwl, overflow);
+            mark = prof_now();
+        }
 
         if (iter > 0 && iter % ESCALATE_WINDOW == 0) {
             if (overflow > overflow_ref * 0.97f && escalate < 30.0f)
@@ -291,8 +308,6 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
 
         st.step = estimate_step(st.v, st.v_prev, grad, st.grad_prev, n2, max_step, st.step);
         nesterov_step(&st, grad);
-        clamp_to_region(nl, core, st.u);
-        clamp_to_region(nl, core, st.v);
         prof_lap(PROF_UPDATE, mark);
         prof_end_iter();
     }
@@ -313,6 +328,8 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     free(st.v);
     free(st.v_prev);
     free(st.grad_prev);
+    free(bound_lo);
+    free(bound_hi);
     backend_destroy(backend);
     grid_free(&grid);
 }

@@ -10,6 +10,8 @@ typedef struct {
     float a;            // coeficiente de Nesterov
     float step;
     float lambda;       // peso de la densidad
+    const float *lo;    // limites de cada coordenada de u y v (NULL = sin
+    const float *hi;    // limites)
 } NesterovState;
 
 // grad ya viene combinado: grad_W + lambda * grad_D
