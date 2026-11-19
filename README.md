@@ -492,6 +492,118 @@ Llevar la longitud de cable y la densidad a la GPU, junto con el cambio a quicks
 Como trabajo futuro se va a seguir optimizando lo que ya corre en la GPU. Lo primero es el kernel de longitud de cable, que es su parte más lenta (18.2 de los 57.3 ms de una iteración en `adaptec1`) porque cada pin lee posiciones dispersas en memoria, y lo segundo son las copias entre CPU y GPU que se hacen en cada iteración. No se va a pasar todo el algoritmo a la GPU: el ciclo de Nesterov, que orquesta todo el proceso, y el legalizador se quedan en la CPU.
 
 
+## Prototipo en Acelerador II (Jetson Nano)
+
+### Ejecución
+
+Se corre igual que en el avance anterior, en la misma Jetson Nano y sin instalar nada aparte.
+
+``` bash
+cd Proyecto
+sudo nvpmodel -m 0 && sudo jetson_clocks
+make gpu && make test-gpu
+OUT_NAME=a2_gpu_4t tests/run_profile.sh gpu 4
+python3 tests/profile_report.py results/jetson/a2_e0_base_gpu_4t results/jetson/a2_gpu_4t > results/jetson/reporte_a2_gpu.md
+```
+
+`make test-gpu` compara la versión con GPU contra la de CPU con los mismos datos antes de medir. Después se corren los cuatro circuitos de a uno y los resultados quedan en `results/jetson/a2_gpu_4t/`, aparte de los del avance anterior. El reporte compara esa corrida contra la versión del Acelerador I. Todo tarda unos 5 minutos.
+
+Los resultados de esta sección están en `Proyecto/results/jetson/`, una carpeta por optimización, y el reporte con todas las tablas por etapa está en `reporte_a2.md`. Cada optimización se midió encima de la anterior, todas en la misma sesión y con la placa en las mismas condiciones. `a2_e0_base_gpu_4t/` es el código del Acelerador I medido otra vez en esa sesión, para comparar contra algo medido igual; sus tiempos quedan prácticamente iguales a los del avance anterior. En el repositorio queda la versión final, que corresponde a E4.
+
+### Punto de partida
+
+En `adaptec1` una iteración del Acelerador I tardaba 56.8 ms. De eso, 18.1 ms eran el kernel de longitud de cable, 16.6 ms la calibración de lambda, 8.9 ms el paso de Nesterov y 6.1 ms el HPWL, y las copias entre CPU y GPU sumaban 3.7 ms. En `newblue1` el kernel llegaba a 40.7 ms porque ese circuito tiene una red de más de 12 000 pines, y un solo hilo la recorría mientras el resto del kernel ya había terminado.
+
+El ciclo de Nesterov, la revisión del overflow y la legalización se mantuvieron en la CPU. La idea fue aprovechar los dos procesadores al mismo tiempo, no pasar todo a la GPU.
+
+### Optimizaciones
+
+E1, kernel de longitud de cable (`wirelength_gpu.cu`). Antes cada hilo leía los pines de su red directo del netlist, y los hilos de un mismo warp terminaban leyendo direcciones lejanas entre sí. Ahora un kernel aparte calcula la posición de cada pin una vez por iteración, las redes van ordenadas por grado para que los hilos de un warp hagan casi el mismo trabajo, y los pines quedan intercalados por warp: el pin k de los 32 hilos de un warp está en 32 posiciones seguidas, así que cada lectura del warp es una sola transacción de memoria. Las redes de 64 pines o más se reparten entre los 256 hilos de un bloque, con las sumas en memoria compartida.
+
+E2, la CPU en paralelo. Con lo pesado en la GPU, lo que quedaba en la CPU corría en un solo hilo. La mediana de lambda pasó de quickselect a una selección por radix sobre los bits del float (`median.c`): son tres pasadas que solo leen el arreglo, cada hilo arma su propio histograma y el resultado es exactamente el mismo valor que antes. Combinar los gradientes, estimar el paso y el paso de Nesterov se reparten entre los cuatro núcleos con OpenMP.
+
+E3, copias y trabajo simultáneo entre CPU y GPU. Las posiciones se suben una sola vez por iteración para los dos cálculos (antes se subían dos veces), y longitud de cable y densidad van en dos streams de CUDA. Mientras la GPU calcula, la CPU saca el HPWL del mismo punto, y apenas llega el gradiente de longitud de cable calcula su mediana mientras la densidad sigue en la GPU.
+
+E4, calidad del resultado. En `newblue1` algunas celdas salían del área de las filas en un paso grande, la densidad dejaba de verlas y el HPWL se disparaba. Además, al elegir el mejor punto el ciclo se quedaba con uno del principio, con overflow de 0.44, y legalizar ese punto multiplicaba el HPWL casi por 30. Ahora el paso de Nesterov mantiene cada celda dentro del área de las filas, y al elegir el mejor punto el overflow se penaliza con un factor de 20 en vez de 5.
+
+Se descartó usar media precisión (FP16), aunque la GPU de la Nano la soporta: con 11 bits de precisión, una coordenada del orden de 10 000 solo se puede representar de 8 en 8 unidades, que es más que el ancho de muchas celdas.
+
+### Perfilado por optimización
+
+Igual que antes, cada corrida guarda el tiempo de cada etapa en cada iteración, lo que da entre 800 y 1000 muestras por etapa en cada circuito y en cada optimización, y los kernels se miden con eventos de CUDA. Así queda una iteración de `adaptec1` después de cada una (ms):
+
+| Etapa | E0 | E1 | E2 | E3 | E4 |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Longitud de cable | 20.3 | 9.6 | 9.6 | 5.6 | 5.7 |
+| Kernel de longitud de cable (GPU) | 18.1 | 7.5 | 7.5 | 8.5 | 8.5 |
+| Densidad | 4.9 | 4.9 | 4.9 | 1.1 | 1.1 |
+| Calibración de lambda | 16.6 | 16.7 | 3.4 | 3.8 | 3.8 |
+| HPWL | 6.1 | 6.2 | 4.7 | 6.9 | 6.8 |
+| Combinar y paso de Nesterov | 8.9 | 8.9 | 5.1 | 5.2 | 6.0 |
+| Iteración completa | 56.8 | 46.4 | 27.8 | 22.6 | 23.3 |
+
+Desde E3 la GPU trabaja al mismo tiempo que la CPU, así que las filas de longitud de cable y densidad pasan a ser solo lo que la CPU se queda esperando cada resultado. El kernel de longitud de cable baja de 18.1 a 7.5 ms en `adaptec1` y de 40.7 a 10.7 ms en `newblue1`, donde la red grande ya no frena todo. E2 es la que más aporta: lambda baja de 16.7 a 3.4 ms. En E3 la subida de posiciones baja de 1.7 a 0.8 ms por iteración. El HPWL y el kernel se vuelven un poco más lentos porque la CPU y la GPU comparten la misma memoria y ahora la usan a la vez, pero la iteración igual baja de 27.8 a 22.6 ms. Mantener las celdas dentro del área en E4 cuesta 0.7 ms por iteración.
+
+Tiempo total de cada corrida, desde el parseo hasta la escritura:
+
+| Circuito | Línea base CPU (s) | E0 (s) | E1 (s) | E2 (s) | E3 (s) | E4 (s) | Mejora contra E0 | Mejora contra CPU |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `adaptec1` | 559.3 | 71.3 | 60.9 | 42.3 | 37.1 | 37.7 | 1.9x | 14.8x |
+| `adaptec2` | 649.6 | 91.3 | 77.9 | 54.3 | 47.8 | 48.9 | 1.9x | 13.3x |
+| `bigblue1` | 678.7 | 90.3 | 77.6 | 56.3 | 49.5 | 50.7 | 1.8x | 13.4x |
+| `newblue1` | 661.9 | 113.2 | 93.2 | 66.2 | 62.0 | 56.9 | 2.0x | 11.6x |
+
+La línea base CPU es la del avance anterior, con los cuatro núcleos de la Jetson. Solo el ciclo de Nesterov de `adaptec1` baja de 56.8 a 23.3 s; el resto de la corrida (parseo, initial placement, legalización y escritura) casi no cambió y ya es 13.2 de los 37.7 s.
+
+### Calidad del resultado
+
+| Circuito | HPWL E0 | HPWL E4 | Diferencia | E4 contra RePlAce |
+| :--- | ---: | ---: | ---: | ---: |
+| `adaptec1` | 1.5502e8 | 1.4889e8 | -3.95 % | 1.98x |
+| `adaptec2` | 2.4099e8 | 2.4227e8 | +0.53 % | 2.96x |
+| `bigblue1` | 1.3028e8 | 1.3194e8 | +1.27 % | 1.48x |
+| `newblue1` | 1.4738e9 | 2.1408e8 | -85.47 % | 3.73x |
+
+E1, E2 y E3 no cambian las cuentas, solo la forma de hacerlas, y su HPWL queda dentro de la variación normal entre corridas. Con E4, `newblue1` pasa de 26 a 3.7 veces el HPWL de RePlAce y deja de ser la excepción, y su legalización baja de 16.5 a 5.7 s porque el punto que recibe está menos amontonado. `adaptec1` también mejora un 4 %, y en `adaptec2` y `bigblue1` las diferencias son del mismo tamaño que la variación entre corridas.
+
+### Animación del colocado
+
+A modo de ejemplo, se grabaron dos corridas con la versión GPU en la Jetson. Con `--frames` el programa guarda un cuadro cada 20 iteraciones (se cambia con `--every N`) y uno al final ya legalizado, y `make_gif.py` los junta en un GIF:
+
+``` bash
+cd Proyecto
+make gpu
+./build/placer_gpu bench/ispd2005/adaptec1.aux --frames cuadros_adaptec1
+python3 tests/make_gif.py cuadros_adaptec1 assets/adaptec1_placement.gif
+./build/placer_gpu bench/ispd2006/newblue1.aux --frames cuadros_newblue1
+python3 tests/make_gif.py cuadros_newblue1 assets/newblue1_placement.gif
+```
+
+En rojo están las celdas fijas, en azul las movibles y en amarillo las zonas donde hay más celdas que espacio.
+
+<p align="center">
+  <img src="Proyecto/assets/adaptec1_placement.gif"
+       alt="Colocado de adaptec1 en la Jetson Nano"
+       width="600">
+</p>
+
+En `adaptec1` las celdas arrancan amontonadas en el centro y encima de los macros fijos, y la densidad las va empujando hacia los huecos, sobre todo en las últimas iteraciones.
+
+<p align="center">
+  <img src="Proyecto/assets/newblue1_placement.gif"
+       alt="Colocado de newblue1 en la Jetson Nano"
+       width="600">
+</p>
+
+En `newblue1` casi todo arranca apilado en la esquina inferior izquierda, y los macros, que aquí son movibles (los bloques azules grandes), se van abriendo hacia el resto del chip junto con las celdas.
+
+### Conclusiones y siguientes pasos
+
+Con las cuatro optimizaciones, la corrida completa queda entre 1.8 y 2.0 veces más rápida que en el Acelerador I y entre 11.6 y 14.8 veces más rápida que la línea base en la CPU de la Jetson. Lo que más rindió fue repartir mejor el trabajo entre los dos procesadores: con lo pesado en la GPU, el límite pasó a ser lo que la CPU hacía en un solo hilo. En calidad, `newblue1` mejora casi siete veces.
+
+Como siguientes pasos, lo que está fuera del ciclo de Nesterov ya es más de un tercio de la corrida, y el initial placement por gradiente conjugado (6.1 s en `adaptec1`) es el siguiente candidato para la GPU o para OpenMP. Dentro del ciclo, la CPU y la GPU de la Nano comparten la misma memoria física, así que se podrían evitar las copias de los gradientes con memoria unificada. Por último, en ningún circuito el overflow llega todavía al objetivo de 0.1 en las 1000 iteraciones (en `adaptec2` se queda en 0.42), y eso es lo que más separa estos resultados de los de RePlAce.
+
+
 ## Dependencias
 
 Se tienen algunas dependencias externas que son manejadas por el archivo `Makefile` y están incluídas en el toolchain de C en linux.
