@@ -50,15 +50,30 @@ int main(int argc, char **argv)
     // invisible hasta el final.
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    if (argc < 2) {
-        fprintf(stderr, "uso: %s benchmark.aux\n", argv[0]);
+    // --frames carpeta guarda la animacion del colocado (un cuadro cada
+    // --every iteraciones, 20 si no se dice); los tiempos de esa corrida
+    // incluyen escribir los cuadros, asi que no sirven para medir
+    const char *aux_path = NULL, *frames_dir = NULL;
+    int every = 20;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc)
+            frames_dir = argv[++i];
+        else if (strcmp(argv[i], "--every") == 0 && i + 1 < argc)
+            every = atoi(argv[++i]);
+        else
+            aux_path = argv[i];
+    }
+    if (!aux_path) {
+        fprintf(stderr, "uso: %s benchmark.aux [--frames carpeta] [--every N]\n", argv[0]);
         return 1;
     }
+    char base[256];
+    base_name(aux_path, base, sizeof base);
 
     struct timespec t0, t1;
     clock_gettime(CLOCK_MONOTONIC, &t0);
     Netlist nl;
-    if (bookshelf_read(argv[1], &nl) < 0)
+    if (bookshelf_read(aux_path, &nl) < 0)
         return 1;
     clock_gettime(CLOCK_MONOTONIC, &t1);
     double t_parseo = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) * 1e-9;
@@ -74,12 +89,20 @@ int main(int argc, char **argv)
     printf("utilizacion: %.1f%%\n", utilization(&nl, v));
     printf("HPWL inicial: %.6e\n", compute_hpwl(&nl, v));
 
+    VizFrames *frames = NULL;
+    if (frames_dir) {
+        frames = viz_frames_open(frames_dir, base, &nl, every, 600);
+        if (!frames)
+            return 1;
+        printf("animacion: un cuadro cada %d iteraciones en %s\n", every, frames_dir);
+    }
+
     // clock() mide CPU de todos los hilos sumada, no de reloj: con OpenMP da un
     // numero varias veces mayor al real. CLOCK_MONOTONIC si es tiempo de pared.
     clock_gettime(CLOCK_MONOTONIC, &t0);
     float overflow;
     PlaceTimings pt = {0};
-    run_placement(&nl, &overflow, &pt);
+    run_placement(&nl, &overflow, &pt, frames);
     clock_gettime(CLOCK_MONOTONIC, &t1);
     double secs = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) * 1e-9;
 
@@ -92,10 +115,11 @@ int main(int argc, char **argv)
     clock_gettime(CLOCK_MONOTONIC, &t1);
     double t_legalizacion = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) * 1e-9;
     netlist_set_positions(&nl, v);
-    printf("HPWL legalizado: %.6e\n", compute_hpwl(&nl, v));
+    double hpwl_legal = compute_hpwl(&nl, v);
+    printf("HPWL legalizado: %.6e\n", hpwl_legal);
+    viz_frames_add(frames, v, "legalizado", -1, hpwl_legal, -1.0f);
+    viz_frames_close(frames);
 
-    char base[256];
-    base_name(argv[1], base, sizeof base);
     char path[300];
 
     clock_gettime(CLOCK_MONOTONIC, &t0);

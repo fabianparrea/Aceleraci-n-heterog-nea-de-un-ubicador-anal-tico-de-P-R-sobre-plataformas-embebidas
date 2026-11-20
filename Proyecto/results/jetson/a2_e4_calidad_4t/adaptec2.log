@@ -1,0 +1,20 @@
+celdas: 255023  redes: 266009  pines: 1069482
+utilizacion: 77.7%
+HPWL inicial: 1.477710e+08
+GPU: NVIDIA Tegra X1 (sm_53, 1 SM), lista en 1.19 s
+  iter    0: HPWL 8.4744e+07  overflow 0.828
+  iter  100: HPWL 8.4639e+07  overflow 0.618
+  iter  200: HPWL 8.7807e+07  overflow 0.540
+  iter  300: HPWL 8.9796e+07  overflow 0.491
+  iter  400: HPWL 9.0839e+07  overflow 0.474
+  iter  500: HPWL 9.1593e+07  overflow 0.460
+  iter  600: HPWL 9.2226e+07  overflow 0.452
+  iter  700: HPWL 9.2677e+07  overflow 0.443
+  iter  800: HPWL 9.3109e+07  overflow 0.437
+  iter  900: HPWL 9.3610e+07  overflow 0.431
+HPWL sin legalizar: 9.398711e+07  overflow: 0.424  tiempo: 39.0 s
+HPWL legalizado: 2.422721e+08
+posiciones finales: adaptec2.out.pl
+imagen del layout: adaptec2.ppm
+tiempos por etapa (s): parseo=3.7316  initial_place=7.6252  nesterov=30.1164  legalizacion=5.4704  escritura=0.7116
+perfil por iteracion: adaptec2.prof.csv

@@ -16,7 +16,7 @@
 #define MIN_ITERS 800
 #define MAX_ITERS 1000
 #define MAX_STEP_GROWTH 1.3f
-#define OVERFLOW_PENALTY 5.0
+#define OVERFLOW_PENALTY 20.0
 
 // combina wirelength + lambda*densidad, y deja en cero las celdas fijas: a
 // wirelength no le importa si una celda es un pin fijo, le calcula gradiente
@@ -25,6 +25,7 @@ static void combine_grad(const Netlist *nl, float *grad, const float *grad_w,
                          const float *grad_d, float lambda)
 {
     int n = nl->num_cells;
+    #pragma omp parallel for if(n > 10000)
     for (int i = 0; i < n; i++) {
         float gx = grad_w[i] + lambda * grad_d[i];
         float gy = grad_w[n + i] + lambda * grad_d[n + i];
@@ -37,6 +38,7 @@ static void combine_grad(const Netlist *nl, float *grad, const float *grad_w,
 static float norm_diff(const float *a, const float *b, int n)
 {
     double sum = 0.0;
+    #pragma omp parallel for reduction(+:sum) if(n > 10000)
     for (int i = 0; i < n; i++) {
         double d = (double)a[i] - b[i];
         sum += d * d;
@@ -126,14 +128,74 @@ static float median_abs(float *abs_vals, const float *v, int n2)
 // la mediana y no la suma porque unas pocas celdas (las que quedan justo en
 // el borde de un macro grande, por ejemplo) pueden tener un gradiente de
 // densidad enorme y arruinar un promedio.
-static float calibrate_lambda(float *scratch, const float *grad_w, const float *grad_d, int n2)
+static float lambda_ratio(float med_w, float med_d)
 {
-    float med_w = median_abs(scratch, grad_w, n2);
-    float med_d = median_abs(scratch, grad_d, n2);
     return med_d > 1e-12f ? med_w / med_d : 1.0f;
 }
 
-void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
+static float calibrate_lambda(const float *grad_w, const float *grad_d, int n2)
+{
+    return lambda_ratio(median_abs(grad_w, n2), median_abs(grad_d, n2));
+}
+
+// rectangulo donde puede quedar el centro de una celda: el area de las filas
+// (donde despues la deja la legalizacion), o la grilla si no hay .scl
+typedef struct {
+    float x0, y0, x1, y1;
+} Region;
+
+static Region core_region(const Netlist *nl, const Grid *grid)
+{
+    Region r = {grid->x0, grid->y0, grid->x0 + grid->nx * grid->bin_w,
+                grid->y0 + grid->ny * grid->bin_h};
+    if (nl->num_rows > 0) {
+        r.x0 = r.y0 = FLT_MAX;
+        r.x1 = r.y1 = -FLT_MAX;
+        for (int k = 0; k < nl->num_rows; k++) {
+            const Row *row = &nl->rows[k];
+            r.x0 = fminf(r.x0, row->x0);
+            r.y0 = fminf(r.y0, row->y0);
+            r.x1 = fmaxf(r.x1, row->x0 + row->num_sites * row->site_w);
+            r.y1 = fmaxf(r.y1, row->y0 + row->height);
+        }
+    }
+    return r;
+}
+
+// Limites de cada coordenada para que el centro de una celda no salga de la
+// region. Afuera de la grilla la densidad ya no ve a la celda (no toca ningun
+// bin) y solo la traen de vuelta las redes, de a poco; mientras tanto el HPWL
+// se dispara. Las celdas fijas no tienen limite. Se arman una sola vez y
+// nesterov_step recorta en el mismo bucle donde actualiza u y v: recorrer
+// las celdas aparte en cada iteracion costaba unos 3 ms en la Jetson.
+static void coord_bounds(const Netlist *nl, Region r, float *lo, float *hi)
+{
+    int n = nl->num_cells;
+    for (int i = 0; i < n; i++) {
+        const Cell *c = &nl->cells[i];
+        if (c->fixed) {
+            lo[i] = lo[n + i] = -FLT_MAX;
+            hi[i] = hi[n + i] = FLT_MAX;
+        } else {
+            lo[i] = r.x0 + c->width / 2;
+            hi[i] = r.x1 - c->width / 2;
+            lo[n + i] = r.y0 + c->height / 2;
+            hi[n + i] = r.y1 - c->height / 2;
+        }
+    }
+}
+
+// wirelength y densidad del punto v, esperando los dos resultados
+static void eval_both(Backend *b, const float *v, float gamma, float *grad_w,
+                      float *grad_d, float *overflow)
+{
+    backend_eval_start(b, v, gamma);
+    backend_wait_wirelength(b, grad_w);
+    backend_wait_density(b, grad_d, overflow);
+}
+
+void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings,
+                   VizFrames *frames)
 {
     struct timespec t0, t1;
 
@@ -156,7 +218,6 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     float *grad = malloc(n2 * sizeof(float));
     float *grad_w = malloc(n2 * sizeof(float));
     float *grad_d = malloc(n2 * sizeof(float));
-    float *scratch = malloc(n2 * sizeof(float));
 
     NesterovState st;
     st.n2 = n2;
@@ -166,6 +227,11 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     st.grad_prev = malloc(n2 * sizeof(float));
     st.a = 1.0f;
     st.lambda = 0.0f;
+    float *bound_lo = malloc(n2 * sizeof(float));
+    float *bound_hi = malloc(n2 * sizeof(float));
+    coord_bounds(nl, core_region(nl, &grid), bound_lo, bound_hi);
+    st.lo = bound_lo;
+    st.hi = bound_hi;
 
     // arranque real: un colocado por minimos cuadrados (cada red tira de sus
     // celdas como un resorte) reparte las celdas segun conectividad antes de
@@ -184,9 +250,14 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     // arranque: se calibra lambda y se arma un punto "anterior" artificial
     // (perturbando en direccion del gradiente) para poder estimar el primer
     // paso con la formula tipo secante de mas abajo.
+<<<<<<< HEAD
     backend_wirelength(backend, st.v, gamma, grad_w);
     backend_density(backend, st.v, grad_d, &overflow);
     float lambda = calibrate_lambda(scratch, grad_w, grad_d, n2);
+=======
+    eval_both(backend, st.v, gamma, grad_w, grad_d, &overflow);
+    float lambda = calibrate_lambda(grad_w, grad_d, n2);
+>>>>>>> origin/feat/OptimizationsFinal
     // una vez que la densidad ya no hace falta (el layout esta parejo) su
     // gradiente se acerca a cero y la proporcion se dispara sin control; por
     // eso lambda se limita a dos ordenes de magnitud alrededor de esta primera
@@ -210,7 +281,11 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     // "penalizado", igual que el sHPWL con el que RePlAce mide sus resultados:
     // en vez de descalificar de una un overflow por encima del objetivo, lo
     // encarece proporcionalmente, asi no se pierde un buen punto que quedo
-    // justo antes de cruzar el umbral.
+    // justo antes de cruzar el umbral. El factor era 5, pero en newblue1 eso
+    // elegia un punto del principio con HPWL bajo y overflow de 0.5, y la
+    // legalizacion de un punto tan amontonado multiplicaba el HPWL por 30.
+    // Con 20 se prefiere uno mas avanzado y mas parejo, que legaliza mucho
+    // mejor; en los otros tres circuitos casi no cambia el punto elegido.
     float *best_u = malloc(n2 * sizeof(float));
     double best_score = DBL_MAX;
     float best_overflow = overflow;
@@ -254,6 +329,12 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
 
         if (iter % 100 == 0)
             printf("  iter %4d: HPWL %.4e  overflow %.3f\n", iter, hpwl, overflow);
+        // el cuadro es del punto v, el mismo del HPWL y el overflow de arriba;
+        // lo que tarda en escribirse no se suma a ninguna etapa del perfil
+        if (viz_frames_due(frames, iter)) {
+            viz_frames_add(frames, st.v, "global", iter, hpwl, overflow);
+            mark = prof_now();
+        }
 
         if (iter > 0 && iter % ESCALATE_WINDOW == 0) {
             if (overflow > overflow_ref * 0.97f && escalate < 30.0f)
@@ -293,7 +374,6 @@ void run_placement(Netlist *nl, float *out_overflow, PlaceTimings *out_timings)
     free(grad);
     free(grad_w);
     free(grad_d);
-    free(scratch);
     free(st.u);
     free(st.v);
     free(st.v_prev);

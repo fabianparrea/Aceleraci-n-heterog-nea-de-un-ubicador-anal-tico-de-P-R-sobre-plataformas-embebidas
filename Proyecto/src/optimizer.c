@@ -9,9 +9,15 @@ void nesterov_step(NesterovState *st, const float *grad)
     float a_new = (1.0f + sqrtf(1.0f + 4.0f * st->a * st->a)) / 2.0f;
     float coeff = (st->a - 1.0f) / a_new;
 
+    // cada coordenada es independiente: se reparte entre los hilos
+    #pragma omp parallel for if(st->n2 > 10000)
     for (int i = 0; i < st->n2; i++) {
         float u_new = st->v[i] - st->step * grad[i];
         float v_new = u_new + coeff * (u_new - st->u[i]);
+        if (st->lo) {
+            u_new = fminf(fmaxf(u_new, st->lo[i]), st->hi[i]);
+            v_new = fminf(fmaxf(v_new, st->lo[i]), st->hi[i]);
+        }
 
         st->v_prev[i] = st->v[i];
         st->grad_prev[i] = grad[i];

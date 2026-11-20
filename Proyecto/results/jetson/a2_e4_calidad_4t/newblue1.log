@@ -1,0 +1,20 @@
+celdas: 330474  redes: 338901  pines: 1244342
+utilizacion: 69.9%
+HPWL inicial: 2.377696e+07
+GPU: NVIDIA Tegra X1 (sm_53, 1 SM), lista en 1.17 s
+  iter    0: HPWL 4.8029e+07  overflow 0.691
+  iter  100: HPWL 4.3220e+07  overflow 0.518
+  iter  200: HPWL 5.0634e+07  overflow 0.481
+  iter  300: HPWL 6.0621e+07  overflow 0.419
+  iter  400: HPWL 8.4204e+07  overflow 0.345
+  iter  500: HPWL 9.9115e+07  overflow 0.282
+  iter  600: HPWL 1.0793e+08  overflow 0.239
+  iter  700: HPWL 1.1306e+08  overflow 0.197
+  iter  800: HPWL 1.1371e+08  overflow 0.173
+  iter  900: HPWL 1.1000e+08  overflow 0.169
+HPWL sin legalizar: 1.068475e+08  overflow: 0.164  tiempo: 45.9 s
+HPWL legalizado: 2.140791e+08
+posiciones finales: newblue1.out.pl
+imagen del layout: newblue1.ppm
+tiempos por etapa (s): parseo=4.3735  initial_place=9.0611  nesterov=35.6037  legalizacion=5.6991  escritura=0.9109
+perfil por iteracion: newblue1.prof.csv
