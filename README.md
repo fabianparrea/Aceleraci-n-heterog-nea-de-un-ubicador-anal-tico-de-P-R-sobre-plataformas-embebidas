@@ -387,7 +387,7 @@ tests/run_profile.sh gpu 4
 python3 tests/profile_report.py results/jetson/cpu_4t results/jetson/gpu_4t > results/jetson/reporte.md
 ```
 
-Esto deja la Jetson en su modo de máximo rendimiento para asegurar un performance parecido entre corridass, compila la versión solo CPU y la versión con GPU, y corre los cuatro circuitos benchmark de a uno, primero en CPU con sus cuatro núcleos y después con la GPU. Las dos versiones van instrumentadas, así que cada corrida guarda el tiempo de cada etapa en cada iteración dentro de `results/jetson/cpu_4t/` y `results/jetson/gpu_4t/`. Al final, `profile_report.py` junta todo en `results/jetson/reporte.md`, con las tablas por etapa y la mejora de la GPU sobre la CPU. La parte de CPU tarda unos 25 minutos y la de GPU unos 7.
+Esto deja la Jetson en su modo de máximo rendimiento para asegurar un performance parecido entre corridas, compila la versión solo CPU y la versión con GPU, y corre los cuatro circuitos benchmark de a uno, primero en CPU con sus cuatro núcleos y después con la GPU. Las dos versiones van instrumentadas, así que cada corrida guarda el tiempo de cada etapa en cada iteración dentro de `results/jetson/cpu_4t/` y `results/jetson/gpu_4t/`. Al final, `profile_report.py` junta todo en `results/jetson/reporte.md`, con las tablas por etapa y la mejora de la GPU sobre la CPU. La parte de CPU tarda unos 25 minutos y la de GPU unos 7.
 
 Los resultados que se muestran en esta sección salen de una corrida que ya se hizo en la Jetson para validar los datos, y están guardados en `Proyecto/results/jetson/`: la línea base en `cpu_base_4t/`, la versión con GPU en `gpu_4t/` y el reporte completo en `reporte_etapas.md`. Si se vuelve a correr el comando de arriba, los resultados nuevos de la GPU reemplazan los de `gpu_4t/`.
 
@@ -602,6 +602,20 @@ En `newblue1` casi todo arranca apilado en la esquina inferior izquierda, y los 
 Con las cuatro optimizaciones, la corrida completa queda entre 1.8 y 2.0 veces más rápida que en el Acelerador I y entre 11.6 y 14.8 veces más rápida que la línea base en la CPU de la Jetson. Lo que más rindió fue repartir mejor el trabajo entre los dos procesadores: con lo pesado en la GPU, el límite pasó a ser lo que la CPU hacía en un solo hilo. En calidad, `newblue1` mejora casi siete veces.
 
 Como siguientes pasos, lo que está fuera del ciclo de Nesterov ya es más de un tercio de la corrida, y el initial placement por gradiente conjugado (6.1 s en `adaptec1`) es el siguiente candidato para la GPU o para OpenMP. Dentro del ciclo, la CPU y la GPU de la Nano comparten la misma memoria física, así que se podrían evitar las copias de los gradientes con memoria unificada. Por último, en ningún circuito el overflow llega todavía al objetivo de 0.1 en las 1000 iteraciones (en `adaptec2` se queda en 0.42), y eso es lo que más separa estos resultados de los de RePlAce.
+
+#### Video de demostración
+
+Se grabó una demostración de 48 segundos de la ejecución GPU en la Jetson Nano. En el video se muestran los cuatro benchmarks (`adaptec1`, `adaptec2`, `bigblue1` y `newblue1`) y sus respectivos resultados.
+
+A continuación, se muestra una versión corta, en forma de gif, de la ejecución:
+
+<p align="center">
+  <img src="Proyecto/assets/GPU02.gif"
+       alt="Demostración de los benchmarks GPU en la Jetson Nano"
+       width="850">
+</p>
+
+**Video de demostración:** [Ver video](https://www.youtube.com/watch?v=WXkXBhayiMI)
 
 
 ## Dependencias
